@@ -3,7 +3,6 @@
 import { RakuTrack, useStore } from "@/lib/store";
 import { formatTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { play, saveTracks, removeSavedTracks } from "@/lib/spotify-api";
 import { rateYouTubeVideo } from "@/lib/youtube-api";
 import { FiPlay, FiHeart, FiMoreHorizontal } from "react-icons/fi";
 
@@ -33,16 +32,10 @@ export default function TrackList({
   const handlePlay = async (track: RakuTrack, index: number) => {
     if (!accessToken) return;
     try {
-      if (provider === "youtube") {
-        setQueue(tracks, index);
-        setCurrentTrack(track);
-        setIsPlaying(true);
-        addToYouTubeHistory(track);
-      } else {
-        await play(accessToken, [track.uri]);
-        setCurrentTrack(track);
-        setIsPlaying(true);
-      }
+      setQueue(tracks, index);
+      setCurrentTrack(track);
+      setIsPlaying(true);
+      addToYouTubeHistory(track);
     } catch {
       // silently fail
     }
@@ -52,21 +45,8 @@ export default function TrackList({
     if (!accessToken || !onToggleLike) return;
     const isLiked = likedIds?.has(track.id) ?? false;
     try {
-      if (provider === "youtube") {
-        await rateYouTubeVideo(
-          accessToken,
-          track.id,
-          isLiked ? "none" : "like",
-        );
-        onToggleLike(track.id, !isLiked);
-      } else {
-        if (isLiked) {
-          await removeSavedTracks(accessToken, [track.id]);
-        } else {
-          await saveTracks(accessToken, [track.id]);
-        }
-        onToggleLike(track.id, !isLiked);
-      }
+      await rateYouTubeVideo(accessToken, track.id, isLiked ? "none" : "like");
+      onToggleLike(track.id, !isLiked);
     } catch {
       // silently fail
     }

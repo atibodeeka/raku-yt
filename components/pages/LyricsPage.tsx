@@ -13,7 +13,6 @@ export default function LyricsPage() {
   const trackName = currentTrack?.name;
   const artistName = currentTrack?.artists?.map((a) => a.name).join(", ");
 
-  // Spotify Web API doesn't directly provide lyrics.
   // We show track info and link to external lyrics sources.
   const searchQuery = currentTrack
     ? encodeURIComponent(

@@ -1,7 +1,7 @@
 {
   "name": "raku",
   "version": "1.0.0",
-  "description": "楽 - Spotify音楽ストリーミングプレーヤー",
+  "description": "楽 - YouTube音楽ストリーミングプレーヤー",
   "main": "main/main.js",
   "scripts": {
     "dev": "concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",

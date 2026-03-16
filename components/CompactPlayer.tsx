@@ -4,7 +4,6 @@ import { useState, useCallback } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { formatTime } from "@/lib/utils";
-import { searchTracks } from "@/lib/spotify-api";
 import { searchYouTubeTracks } from "@/lib/youtube-api";
 import {
   FiPlay,
@@ -20,7 +19,6 @@ import {
   FiVolume2,
   FiVolumeX,
 } from "react-icons/fi";
-import { setVolume as apiSetVolume } from "@/lib/spotify-api";
 
 interface CompactPlayerProps {
   onPlayPause: () => void;
@@ -72,9 +70,6 @@ export default function CompactPlayer({
   const handleVolumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseInt(e.target.value, 10);
     setVolume(vol);
-    if (provider !== "youtube" && accessToken) {
-      await apiSetVolume(accessToken, vol);
-    }
   };
 
   const handleTrackClick = (index: number) => {
@@ -105,22 +100,14 @@ export default function CompactPlayer({
     if (!q) return;
     setSearching(true);
     try {
-      if (provider === "youtube") {
-        const tracks = await searchYouTubeTracks(q);
-        setSearchResults(tracks);
-      } else {
-        if (!accessToken) return;
-        const data = await searchTracks(accessToken, q);
-        if (data?.tracks?.items) {
-          setSearchResults(data.tracks.items);
-        }
-      }
+      const tracks = await searchYouTubeTracks(q);
+      setSearchResults(tracks);
     } catch {
       // silently fail
     } finally {
       setSearching(false);
     }
-  }, [searchQuery, provider, accessToken]);
+  }, [searchQuery]);
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSearch();

@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import type { Language } from "./i18n";
 
-export type Provider = "spotify" | "youtube";
+export type Provider = "youtube";
 
 // Unified track type for both providers
 export interface RakuTrack {

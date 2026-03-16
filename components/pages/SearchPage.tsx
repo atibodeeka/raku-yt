@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
-import { searchTracks } from "@/lib/spotify-api";
 import { searchYouTubeTracks } from "@/lib/youtube-api";
 import TrackList from "@/components/TrackList";
 import Spinner from "@/components/ui/Spinner";
@@ -11,8 +10,6 @@ import { t } from "@/lib/i18n";
 import { FiSearch } from "react-icons/fi";
 
 export default function SearchPage() {
-  const accessToken = useStore((s) => s.accessToken);
-  const provider = useStore((s) => s.provider);
   const searchQuery = useStore((s) => s.searchQuery);
   const setSearchQuery = useStore((s) => s.setSearchQuery);
   const [results, setResults] = useState<RakuTrack[]>([]);
@@ -28,23 +25,15 @@ export default function SearchPage() {
       setLoading(true);
       setSearched(true);
       try {
-        if (provider === "youtube") {
-          const tracks = await searchYouTubeTracks(q.trim());
-          setResults(tracks);
-        } else {
-          if (!accessToken) return;
-          const data = await searchTracks(accessToken, q.trim());
-          if (data?.tracks?.items) {
-            setResults(data.tracks.items);
-          }
-        }
+        const tracks = await searchYouTubeTracks(q.trim());
+        setResults(tracks);
       } catch (err) {
         console.error("検索エラー:", err);
       } finally {
         setLoading(false);
       }
     },
-    [accessToken, provider, searchQuery],
+    [searchQuery],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

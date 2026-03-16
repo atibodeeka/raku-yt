@@ -12,16 +12,6 @@ export const translations = {
   "nav.logout": { ja: "ログアウト", en: "Logout", ko: "로그아웃" },
 
   // Provider labels
-  "provider.spotifyPremium": {
-    ja: "Spotify プレミアム",
-    en: "Spotify Premium",
-    ko: "Spotify 프리미엄",
-  },
-  "provider.spotifyFree": {
-    ja: "Spotify フリー",
-    en: "Spotify Free",
-    ko: "Spotify 프리",
-  },
   "user.default": { ja: "ユーザー", en: "User", ko: "사용자" },
 
   // Player
@@ -88,11 +78,7 @@ export const translations = {
     en: "Failed to fetch data. Check YouTube API key or network.",
     ko: "데이터를 가져오지 못했습니다. YouTube API 키 또는 네트워크를 확인하세요.",
   },
-  "home.spotifyFetchError": {
-    ja: "データの取得に失敗しました。ネットワークを確認してください。",
-    en: "Failed to fetch data. Check your network.",
-    ko: "데이터를 가져오지 못했습니다. 네트워크를 확인하세요.",
-  },
+
   "home.unexpectedError": {
     ja: "予期しないエラーが発生しました。",
     en: "An unexpected error occurred.",
@@ -167,9 +153,9 @@ export const translations = {
   "lyrics.title": { ja: "歌詞", en: "Lyrics", ko: "가사" },
   "lyrics.divider": { ja: "♪ 歌詞 ♪", en: "♪ Lyrics ♪", ko: "♪ 가사 ♪" },
   "lyrics.unavailable": {
-    ja: "Spotify Web APIでは歌詞データを直接取得できません。\n以下のリンクから歌詞を検索できます。",
-    en: "Lyrics are not directly available via Spotify Web API.\nYou can search for lyrics using the links below.",
-    ko: "Spotify Web API에서는 가사 데이터를 직접 가져올 수 없습니다.\n아래 링크에서 가사를 검색할 수 있습니다.",
+    ja: "歌詞データを直接取得できません。\n以下のリンクから歌詞を検索できます。",
+    en: "Lyrics are not directly available.\nYou can search for lyrics using the links below.",
+    ko: "가사 데이터를 직접 가져올 수 없습니다.\n아래 링크에서 가사를 검색할 수 있습니다.",
   },
   "lyrics.searchGoogle": {
     ja: "Googleで歌詞を検索",
@@ -222,12 +208,6 @@ export const translations = {
     en: "Log in with your preferred service\nand enjoy the music",
     ko: "원하는 서비스로 로그인하여\n음악을 즐기세요",
   },
-  "login.spotify": {
-    ja: "Spotifyでログイン",
-    en: "Login with Spotify",
-    ko: "Spotify로 로그인",
-  },
-  "login.or": { ja: "または", en: "or", ko: "또는" },
   "login.youtube": {
     ja: "YouTubeでログイン",
     en: "Login with YouTube",

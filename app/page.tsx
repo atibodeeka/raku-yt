@@ -3,17 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useStore } from "@/lib/store";
 import { loadTokens } from "@/lib/auth-storage";
-import { getCurrentUser } from "@/lib/spotify-api";
 import { getYouTubeUserInfo } from "@/lib/youtube-api";
-import {
-  pause,
-  play,
-  seek,
-  setRepeat as apiSetRepeat,
-  setShuffle as apiSetShuffle,
-  skipToNext,
-  skipToPrevious,
-} from "@/lib/spotify-api";
 import { useYouTubePlayer } from "@/components/YouTubePlayer";
 import TitleBar from "@/components/TitleBar";
 import Sidebar from "@/components/Sidebar";
@@ -37,10 +27,6 @@ export default function Home() {
   const compactMode = useStore((s) => s.compactMode);
   const setUser = useStore((s) => s.setUser);
   const clearAuth = useStore((s) => s.clearAuth);
-
-  // Shared playback controls for compact mode
-  const isYouTube = provider === "youtube";
-  const isSpotify = provider === "spotify";
 
   const playNextYouTube = useCallback(() => {
     const { queue, queueIndex, repeat, shuffle } = useStore.getState();
@@ -69,56 +55,29 @@ export default function Home() {
 
   const handlePlayPause = async () => {
     const { isPlaying } = useStore.getState();
-    if (isYouTube) {
-      if (isPlaying) ytPause();
-      else ytPlay();
-      return;
-    }
-    if (!accessToken) return;
-    if (isPlaying) {
-      await pause(accessToken);
-      useStore.getState().setIsPlaying(false);
-    } else {
-      await play(accessToken);
-      useStore.getState().setIsPlaying(true);
-    }
+    if (isPlaying) ytPause();
+    else ytPlay();
   };
 
   const handlePrev = async () => {
-    if (isYouTube) {
-      const { queue, queueIndex, progress } = useStore.getState();
-      if (progress > 3000 || queue.length === 0 || queueIndex <= 0) {
-        ytSeek(0);
-      } else {
-        const prevIndex = queueIndex - 1;
-        useStore.getState().setQueueIndex(prevIndex);
-        useStore.getState().setCurrentTrack(queue[prevIndex]);
-        useStore.getState().addToYouTubeHistory(queue[prevIndex]);
-      }
-      return;
+    const { queue, queueIndex, progress } = useStore.getState();
+    if (progress > 3000 || queue.length === 0 || queueIndex <= 0) {
+      ytSeek(0);
+    } else {
+      const prevIndex = queueIndex - 1;
+      useStore.getState().setQueueIndex(prevIndex);
+      useStore.getState().setCurrentTrack(queue[prevIndex]);
+      useStore.getState().addToYouTubeHistory(queue[prevIndex]);
     }
-    if (!accessToken) return;
-    await skipToPrevious(accessToken);
   };
 
   const handleNext = async () => {
-    if (isYouTube) {
-      playNextYouTube();
-      return;
-    }
-    if (!accessToken) return;
-    await skipToNext(accessToken);
+    playNextYouTube();
   };
 
   const handleShuffle = async () => {
     const { shuffle } = useStore.getState();
-    if (isYouTube) {
-      useStore.getState().setShuffle(!shuffle);
-      return;
-    }
-    if (!accessToken) return;
     useStore.getState().setShuffle(!shuffle);
-    await apiSetShuffle(accessToken, !shuffle);
   };
 
   const handleRepeat = async () => {
@@ -127,19 +86,12 @@ export default function Home() {
     const nextIdx = (states.indexOf(repeat) + 1) % states.length;
     const newState = states[nextIdx];
     useStore.getState().setRepeat(newState);
-    if (isYouTube) return;
-    if (!accessToken) return;
-    await apiSetRepeat(accessToken, newState);
   };
 
   const handleSeek = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const pos = parseInt(e.target.value, 10);
     useStore.getState().setProgress(pos);
-    if (isYouTube) {
-      ytSeek(pos);
-      return;
-    }
-    if (accessToken) await seek(accessToken, pos);
+    ytSeek(pos);
   };
 
   useEffect(() => {
@@ -155,11 +107,9 @@ export default function Home() {
 
   useEffect(() => {
     if (accessToken && provider && !user) {
-      const fetchUser =
-        provider === "youtube"
-          ? getYouTubeUserInfo(accessToken)
-          : getCurrentUser(accessToken);
-      fetchUser.then((userData) => setUser(userData)).catch(() => clearAuth());
+      getYouTubeUserInfo(accessToken)
+        .then((userData) => setUser(userData))
+        .catch(() => clearAuth());
     }
   }, [accessToken, provider, user, setUser, clearAuth]);
 

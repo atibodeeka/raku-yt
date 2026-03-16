@@ -2,9 +2,8 @@
 
 import { useStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
-import { redirectToSpotifyAuth } from "@/lib/spotify-auth";
 import { redirectToYouTubeAuth } from "@/lib/youtube-auth";
-import { FaSpotify, FaYoutube } from "react-icons/fa";
+import { FaYoutube } from "react-icons/fa";
 
 export default function LoginScreen() {
   const language = useStore((s) => s.language);
@@ -42,23 +41,8 @@ export default function LoginScreen() {
           ))}
         </p>
 
-        {/* Login buttons */}
+        {/* Login button */}
         <div className="flex flex-col gap-3 items-center">
-          <button
-            onClick={() => redirectToSpotifyAuth()}
-            className="w-64 inline-flex items-center justify-center gap-3 bg-[#1DB954] hover:bg-[#1ed760] text-white font-bold py-3 px-8 rounded-full transition-all hover:shadow-lg hover:shadow-[#1DB954]/20 active:scale-95">
-            <FaSpotify size={20} />
-            <span>{t("login.spotify", language)}</span>
-          </button>
-
-          <div className="flex items-center gap-3 my-1">
-            <div className="h-px w-8 bg-gray-600" />
-            <span className="text-gray-500 text-xs">
-              {t("login.or", language)}
-            </span>
-            <div className="h-px w-8 bg-gray-600" />
-          </div>
-
           <button
             onClick={() => redirectToYouTubeAuth()}
             className="w-64 inline-flex items-center justify-center gap-3 bg-[#FF0000] hover:bg-[#CC0000] text-white font-bold py-3 px-8 rounded-full transition-all hover:shadow-lg hover:shadow-[#FF0000]/20 active:scale-95">
@@ -69,7 +53,7 @@ export default function LoginScreen() {
 
         {/* Footer */}
         <p className="text-gray-600 text-xs mt-12">
-          Powered by Spotify Web API &amp; YouTube Data API
+          Powered by YouTube Data API
         </p>
       </div>
     </div>

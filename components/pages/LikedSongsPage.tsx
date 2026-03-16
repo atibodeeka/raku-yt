@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
-import { getSavedTracks } from "@/lib/spotify-api";
 import { getYouTubeLikedVideos } from "@/lib/youtube-api";
 import TrackList from "@/components/TrackList";
 import Spinner from "@/components/ui/Spinner";
@@ -11,57 +10,29 @@ import { FiHeart } from "react-icons/fi";
 
 export default function LikedSongsPage() {
   const accessToken = useStore((s) => s.accessToken);
-  const provider = useStore((s) => s.provider);
   const [tracks, setTracks] = useState<RakuTrack[]>([]);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
   const language = useStore((s) => s.language);
 
-  const fetchLiked = useCallback(
-    async (loadOffset = 0) => {
-      if (!accessToken) return;
-      setLoading(true);
-      try {
-        if (provider === "youtube") {
-          const ytTracks = await getYouTubeLikedVideos(accessToken, 50);
-          setTracks(ytTracks);
-          setLikedIds(new Set(ytTracks.map((t) => t.id)));
-          setTotal(ytTracks.length);
-        } else {
-          const data = await getSavedTracks(accessToken, 50, loadOffset);
-          if (data?.items) {
-            const newTracks: RakuTrack[] = data.items.map(
-              (item: { track: RakuTrack }) => item.track,
-            );
-            const ids = new Set(newTracks.map((t) => t.id));
-
-            if (loadOffset === 0) {
-              setTracks(newTracks);
-              setLikedIds(ids);
-            } else {
-              setTracks((prev) => [...prev, ...newTracks]);
-              setLikedIds(
-                (prev) => new Set([...Array.from(prev), ...Array.from(ids)]),
-              );
-            }
-
-            setTotal(data.total || 0);
-            setOffset(loadOffset + 50);
-          }
-        }
-      } catch (err) {
-        console.error("お気に入り取得エラー:", err);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [accessToken, provider],
-  );
+  const fetchLiked = useCallback(async () => {
+    if (!accessToken) return;
+    setLoading(true);
+    try {
+      const ytTracks = await getYouTubeLikedVideos(accessToken, 50);
+      setTracks(ytTracks);
+      setLikedIds(new Set(ytTracks.map((t) => t.id)));
+      setTotal(ytTracks.length);
+    } catch (err) {
+      console.error("お気に入り取得エラー:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken]);
 
   useEffect(() => {
-    fetchLiked(0);
+    fetchLiked();
   }, [fetchLiked]);
 
   const handleToggleLike = (trackId: string, isLiked: boolean) => {
@@ -75,12 +46,6 @@ export default function LikedSongsPage() {
       }
       return next;
     });
-  };
-
-  const handleLoadMore = () => {
-    if (offset < total) {
-      fetchLiked(offset);
-    }
   };
 
   return (
@@ -115,18 +80,6 @@ export default function LikedSongsPage() {
               onToggleLike={handleToggleLike}
             />
           </div>
-          {offset < total && (
-            <div className="text-center mt-4">
-              <button
-                onClick={handleLoadMore}
-                disabled={loading}
-                className="btn-retro text-xs text-gray-500 hover:text-melon-green">
-                {loading
-                  ? t("liked.loading", language)
-                  : t("liked.loadMore", language)}
-              </button>
-            </div>
-          )}
         </>
       ) : (
         <div className="text-center py-20">

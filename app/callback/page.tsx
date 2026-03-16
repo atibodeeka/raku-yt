@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { exchangeCodeForToken } from "@/lib/spotify-auth";
 import { exchangeYouTubeCodeForToken } from "@/lib/youtube-auth";
 import { useStore } from "@/lib/store";
 import { saveTokens } from "@/lib/auth-storage";
@@ -16,7 +15,6 @@ function CallbackContent() {
   useEffect(() => {
     const code = searchParams.get("code");
     const authError = searchParams.get("error");
-    const state = searchParams.get("state");
 
     if (authError) {
       console.error("OAuth error:", authError);
@@ -25,26 +23,15 @@ function CallbackContent() {
     }
 
     if (code) {
-      const isYouTube = state === "youtube";
-      console.log(
-        "Exchange token for provider:",
-        isYouTube ? "youtube" : "spotify",
-      );
-
-      const exchangeFn = isYouTube
-        ? exchangeYouTubeCodeForToken(code)
-        : exchangeCodeForToken(code);
-
-      exchangeFn
+      exchangeYouTubeCodeForToken(code)
         .then((data) => {
           console.log("Token exchange success, expires_in:", data.expires_in);
           const expiry = Date.now() + data.expires_in * 1000;
-          const provider = isYouTube ? "youtube" : "spotify";
 
-          setProvider(provider);
+          setProvider("youtube");
           setAuth(data.access_token, data.refresh_token || "", expiry);
           saveTokens(
-            provider,
+            "youtube",
             data.access_token,
             data.refresh_token || "",
             expiry,

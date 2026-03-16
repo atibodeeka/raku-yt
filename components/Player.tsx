@@ -4,17 +4,6 @@ import { useCallback, useEffect, useRef } from "react";
 import { useStore } from "@/lib/store";
 import { formatTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import {
-  getCurrentPlayback,
-  pause,
-  play,
-  seek,
-  setRepeat as apiSetRepeat,
-  setShuffle as apiSetShuffle,
-  setVolume as apiSetVolume,
-  skipToNext,
-  skipToPrevious,
-} from "@/lib/spotify-api";
 import { useYouTubePlayer } from "@/components/YouTubePlayer";
 import {
   FiPlay,
@@ -53,9 +42,6 @@ export default function Player() {
   const toast = useStore((s) => s.toast);
   const language = useStore((s) => s.language);
 
-  const isSpotify = provider === "spotify";
-  const isYouTube = provider === "youtube";
-
   // Queue-based next track for YouTube
   const playNextYouTube = useCallback(() => {
     const { queue, queueIndex, repeat, shuffle } = useStore.getState();
@@ -89,161 +75,47 @@ export default function Player() {
   const { ytPlay, ytPause, ytSeek, ytSetVolume } =
     useYouTubePlayer(playNextYouTube);
 
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
-
-  const fetchPlayback = useCallback(async () => {
-    if (!accessToken || !isSpotify) return;
-    try {
-      const data = await getCurrentPlayback(accessToken);
-      if (data && data.item) {
-        setCurrentTrack({
-          id: data.item.id,
-          name: data.item.name,
-          artists: data.item.artists,
-          album: data.item.album,
-          duration_ms: data.item.duration_ms,
-          uri: data.item.uri,
-          preview_url: data.item.preview_url,
-          provider: "spotify",
-        });
-        setIsPlaying(data.is_playing);
-        setProgress(data.progress_ms || 0);
-        setDuration(data.item.duration_ms);
-        setShuffle(data.shuffle_state);
-        setRepeat(data.repeat_state);
-      }
-    } catch {
-      // silently fail
-    }
-  }, [
-    accessToken,
-    isSpotify,
-    setCurrentTrack,
-    setIsPlaying,
-    setProgress,
-    setDuration,
-    setShuffle,
-    setRepeat,
-  ]);
-
-  // Poll playback state (Spotify only)
-  useEffect(() => {
-    if (isSpotify && accessToken) {
-      fetchPlayback();
-      pollRef.current = setInterval(fetchPlayback, 3000);
-    }
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [isSpotify, accessToken, fetchPlayback]);
-
-  // Progress ticker (Spotify only)
-  useEffect(() => {
-    let ticker: NodeJS.Timeout;
-    if (isSpotify && isPlaying) {
-      ticker = setInterval(() => {
-        setProgress(Math.min(useStore.getState().progress + 1000, duration));
-      }, 1000);
-    }
-    return () => clearInterval(ticker);
-  }, [isSpotify, isPlaying, duration, setProgress]);
-
   const handlePlayPause = async () => {
-    if (isYouTube) {
-      if (isPlaying) ytPause();
-      else ytPlay();
-      return;
-    }
-    if (!accessToken) return;
-    try {
-      if (isPlaying) {
-        await pause(accessToken);
-        setIsPlaying(false);
-      } else {
-        await play(accessToken);
-        setIsPlaying(true);
-      }
-    } catch {
-      // silently fail
-    }
+    if (isPlaying) ytPause();
+    else ytPlay();
   };
 
   const handlePrev = async () => {
-    if (isYouTube) {
-      const { queue, queueIndex, progress } = useStore.getState();
-      if (progress > 3000 || queue.length === 0 || queueIndex <= 0) {
-        ytSeek(0);
-      } else {
-        const prevIndex = queueIndex - 1;
-        setQueueIndex(prevIndex);
-        setCurrentTrack(queue[prevIndex]);
-        addToYouTubeHistory(queue[prevIndex]);
-      }
-      return;
+    const { queue, queueIndex, progress } = useStore.getState();
+    if (progress > 3000 || queue.length === 0 || queueIndex <= 0) {
+      ytSeek(0);
+    } else {
+      const prevIndex = queueIndex - 1;
+      setQueueIndex(prevIndex);
+      setCurrentTrack(queue[prevIndex]);
+      addToYouTubeHistory(queue[prevIndex]);
     }
-    if (!accessToken) return;
-    await skipToPrevious(accessToken);
-    setTimeout(fetchPlayback, 300);
   };
 
   const handleNext = async () => {
-    if (isYouTube) {
-      playNextYouTube();
-      return;
-    }
-    if (!accessToken) return;
-    await skipToNext(accessToken);
-    setTimeout(fetchPlayback, 300);
+    playNextYouTube();
   };
 
   const handleSeek = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const pos = parseInt(e.target.value, 10);
     setProgress(pos);
-    if (isYouTube) {
-      ytSeek(pos);
-      return;
-    }
-    if (accessToken) await seek(accessToken, pos);
+    ytSeek(pos);
   };
 
   const handleVolumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseInt(e.target.value, 10);
     setVolume(vol);
-    if (isYouTube) {
-      ytSetVolume(vol);
-      return;
-    }
-    if (accessToken) await apiSetVolume(accessToken, vol);
+    ytSetVolume(vol);
   };
 
   const handleShuffle = async () => {
-    if (isYouTube) {
-      setShuffle(!shuffle);
-      return;
-    }
-    if (!accessToken || !isSpotify) return;
-    const newState = !shuffle;
-    setShuffle(newState);
-    await apiSetShuffle(accessToken, newState);
+    setShuffle(!shuffle);
   };
 
   const handleRepeat = async () => {
-    if (isYouTube) {
-      const states: ("off" | "context" | "track")[] = [
-        "off",
-        "context",
-        "track",
-      ];
-      const nextIdx = (states.indexOf(repeat) + 1) % states.length;
-      setRepeat(states[nextIdx]);
-      return;
-    }
-    if (!accessToken || !isSpotify) return;
     const states: ("off" | "context" | "track")[] = ["off", "context", "track"];
     const nextIdx = (states.indexOf(repeat) + 1) % states.length;
-    const newState = states[nextIdx];
-    setRepeat(newState);
-    await apiSetRepeat(accessToken, newState);
+    setRepeat(states[nextIdx]);
   };
 
   const albumArt = currentTrack?.album?.images?.[0]?.url;

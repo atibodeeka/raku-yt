@@ -36,12 +36,7 @@ export default function Sidebar() {
     clearAuth();
   };
 
-  const providerLabel =
-    provider === "youtube"
-      ? "YouTube"
-      : user?.product === "premium"
-        ? t("provider.spotifyPremium", language)
-        : t("provider.spotifyFree", language);
+  const providerLabel = "YouTube";
 
   return (
     <aside className="w-48 bg-melon-sidebar flex flex-col shrink-0">

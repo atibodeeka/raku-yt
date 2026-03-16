@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "楽 Raku Player",
-  description: "Spotify音楽ストリーミングプレーヤー",
+  description: "YouTube音楽ストリーミングプレーヤー",
 };
 
 export default function RootLayout({

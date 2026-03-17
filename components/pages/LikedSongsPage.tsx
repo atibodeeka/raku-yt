@@ -10,6 +10,7 @@ import { FiHeart } from "react-icons/fi";
 
 export default function LikedSongsPage() {
   const isLoggedIn = useStore((s) => s.isLoggedIn);
+  const currentPage = useStore((s) => s.currentPage);
   const [tracks, setTracks] = useState<RakuTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -29,9 +30,12 @@ export default function LikedSongsPage() {
     }
   }, [isLoggedIn]);
 
+  // Refetch every time user navigates to this page
   useEffect(() => {
-    fetchLiked();
-  }, [fetchLiked]);
+    if (currentPage === "liked") {
+      fetchLiked();
+    }
+  }, [currentPage, fetchLiked]);
 
   return (
     <div className="p-6">

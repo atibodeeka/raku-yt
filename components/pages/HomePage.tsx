@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
-import { getYouTubeHomeSections, getYouTubeHistory } from "@/lib/youtube-api";
+import {
+  getYouTubeHomeSections,
+  getYouTubeHistory,
+  getYouTubeLibraryPlaylists,
+  getYouTubeSubscriptions,
+} from "@/lib/youtube-api";
+import type { LibraryPlaylistItem, SubscriptionItem } from "@/lib/youtube-api";
 import TrackList from "@/components/TrackList";
 import Spinner from "@/components/ui/Spinner";
 import PageHeader from "@/components/ui/PageHeader";
@@ -14,6 +20,7 @@ import {
   FiList,
   FiMusic,
   FiChevronRight,
+  FiUsers,
 } from "react-icons/fi";
 
 // Horizontal scrollable card for a track (Recently Played / Quick Picks)
@@ -60,25 +67,22 @@ function TrackCard({
   );
 }
 
-// Horizontal scrollable card for a playlist/album
-function PlaylistCard({
-  track,
+// Horizontal scrollable card for a library playlist
+function LibraryPlaylistCard({
+  playlist,
   onClick,
 }: {
-  track: RakuTrack;
+  playlist: LibraryPlaylistItem;
   onClick: () => void;
 }) {
-  const thumbnail = track.album?.images?.[0]?.url;
-  const artistName = track.artists?.map((a) => a.name).join(", ") || "";
-
   return (
     <button
       onClick={onClick}
       className="group shrink-0 w-44 rounded-lg overflow-hidden bg-white border border-gray-200 hover:shadow-md transition-shadow text-left">
       <div className="relative w-44 h-44 bg-gray-100">
-        {thumbnail ? (
+        {playlist.thumbnail ? (
           <img
-            src={thumbnail}
+            src={playlist.thumbnail}
             alt=""
             loading="lazy"
             className="w-full h-full object-cover"
@@ -92,10 +96,48 @@ function PlaylistCard({
       </div>
       <div className="p-2">
         <p className="text-[12px] font-medium text-gray-800 truncate">
-          {track.name}
+          {playlist.name}
         </p>
-        <p className="text-[11px] text-gray-500 truncate">{artistName}</p>
+        <p className="text-[11px] text-gray-500 truncate">
+          {playlist.subtitle}
+        </p>
       </div>
+    </button>
+  );
+}
+
+// Horizontal scrollable card for a subscribed artist
+function SubscriptionCard({
+  artist,
+  onClick,
+}: {
+  artist: SubscriptionItem;
+  onClick: () => void;
+}) {
+  return (
+    <button onClick={onClick} className="group shrink-0 w-32 text-center">
+      <div className="w-28 h-28 mx-auto rounded-full bg-gray-100 overflow-hidden border border-gray-200 group-hover:shadow-md transition-shadow">
+        {artist.thumbnail ? (
+          <img
+            src={artist.thumbnail}
+            alt=""
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <FiUsers size={24} className="text-gray-300" />
+          </div>
+        )}
+      </div>
+      <p className="text-[12px] font-medium text-gray-800 truncate mt-2 px-1">
+        {artist.name}
+      </p>
+      {artist.subtitle && (
+        <p className="text-[10px] text-gray-500 truncate px-1">
+          {artist.subtitle}
+        </p>
+      )}
     </button>
   );
 }
@@ -108,11 +150,16 @@ export default function HomePage() {
   const addToYouTubeHistory = useStore((s) => s.addToYouTubeHistory);
   const setPlaylistPage = useStore((s) => s.setPlaylistPage);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
+  const setArtistPage = useStore((s) => s.setArtistPage);
 
   const [homeSections, setHomeSections] = useState<
     { title: string; tracks: RakuTrack[] }[]
   >([]);
   const [recentTracks, setRecentTracks] = useState<RakuTrack[]>([]);
+  const [libraryPlaylists, setLibraryPlaylists] = useState<
+    LibraryPlaylistItem[]
+  >([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,12 +167,16 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
     try {
-      const [sections, history] = await Promise.all([
+      const [sections, history, playlists, subs] = await Promise.all([
         getYouTubeHomeSections(),
         getYouTubeHistory().catch(() => []),
+        getYouTubeLibraryPlaylists().catch(() => []),
+        getYouTubeSubscriptions().catch(() => []),
       ]);
       setHomeSections(sections);
       setRecentTracks(history.slice(0, 20));
+      setLibraryPlaylists(playlists);
+      setSubscriptions(subs);
       if (sections.length === 0 && history.length === 0) {
         setError(t("home.fetchError", useStore.getState().language));
       }
@@ -141,26 +192,21 @@ export default function HomePage() {
     fetchData();
   }, [fetchData]);
 
-  // Separate playlists/albums from song-only sections
-  const playlistItems: RakuTrack[] = [];
+  // Separate playlists/albums from song-only sections, skip unreliable sections like Shorts
+  const skipPatterns = /shorts|มาแรงใน/i;
   const songSections: { title: string; tracks: RakuTrack[] }[] = [];
 
   for (const section of homeSections) {
-    const playlists = section.tracks.filter(
-      (t) => t.itemType === "album" || t.itemType === "playlist",
-    );
+    if (skipPatterns.test(section.title)) continue;
     const songs = section.tracks.filter(
       (t) => t.itemType !== "album" && t.itemType !== "playlist",
     );
-    playlistItems.push(...playlists);
     if (songs.length > 0) {
       songSections.push({ title: section.title, tracks: songs });
     }
   }
 
-  // Get first song section as "Quick Picks"
-  const quickPicks = songSections.length > 0 ? songSections[0] : null;
-  const remainingSections = songSections.slice(1);
+  const remainingSections = songSections;
 
   const handlePlayTrack = (track: RakuTrack, allTracks: RakuTrack[]) => {
     const idx = allTracks.findIndex((t) => t.id === track.id);
@@ -170,10 +216,17 @@ export default function HomePage() {
     addToYouTubeHistory(track);
   };
 
-  const handlePlaylistClick = (track: RakuTrack) => {
-    const thumbnail = track.album?.images?.[0]?.url || "";
-    setPlaylistPage({ id: track.id, name: track.name, thumbnail });
+  const handleLibraryPlaylistClick = (playlist: LibraryPlaylistItem) => {
+    const id = playlist.playlistId.startsWith("VL")
+      ? playlist.playlistId.slice(2)
+      : playlist.playlistId;
+    setPlaylistPage({ id, name: playlist.name, thumbnail: playlist.thumbnail });
     setCurrentPage("playlist");
+  };
+
+  const handleSubscriptionClick = (artist: SubscriptionItem) => {
+    setArtistPage({ id: artist.channelId, name: artist.name });
+    setCurrentPage("artist");
   };
 
   if (loading) {
@@ -230,56 +283,43 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Playlists & Albums */}
-      {playlistItems.length > 0 && (
+      {/* Playlists & Albums — from user's real library */}
+      {libraryPlaylists.length > 0 && (
         <section className="mb-8">
           <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
             <FiList size={14} className="text-melon-green" />
             {t("home.yourPlaylists", language)}
           </h2>
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-            {playlistItems.map((track, i) => (
-              <PlaylistCard
-                key={`${track.id}-${i}`}
-                track={track}
-                onClick={() => handlePlaylistClick(track)}
+            {libraryPlaylists.map((pl, i) => (
+              <LibraryPlaylistCard
+                key={`${pl.playlistId}-${i}`}
+                playlist={pl}
+                onClick={() => handleLibraryPlaylistClick(pl)}
               />
             ))}
           </div>
         </section>
       )}
 
-      {/* Quick Picks */}
-      {quickPicks && quickPicks.tracks.length > 0 && (
+      {/* Subscribed Artists */}
+      {subscriptions.length > 0 && (
         <section className="mb-8">
           <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <FiMusic size={14} className="text-melon-green" />
-            {t("home.quickPicks", language)}
+            <FiUsers size={14} className="text-melon-green" />
+            {t("home.subscriptions", language)}
           </h2>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-            {quickPicks.tracks.slice(0, 20).map((track, i) => (
-              <TrackCard
-                key={`${track.id}-${i}`}
-                track={track}
-                onPlay={() => handlePlayTrack(track, quickPicks.tracks)}
+          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+            {subscriptions.map((artist, i) => (
+              <SubscriptionCard
+                key={`${artist.channelId}-${i}`}
+                artist={artist}
+                onClick={() => handleSubscriptionClick(artist)}
               />
             ))}
           </div>
         </section>
       )}
-
-      {/* Remaining song sections (Top 50, etc.) as TrackList tables */}
-      {remainingSections.map((section, idx) => (
-        <section key={idx} className="mb-8">
-          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <FiTrendingUp size={14} className="text-melon-green" />
-            {section.title}
-          </h2>
-          <div className="border border-gray-200 rounded overflow-hidden">
-            <TrackList tracks={section.tracks} showRank />
-          </div>
-        </section>
-      ))}
     </div>
   );
 }

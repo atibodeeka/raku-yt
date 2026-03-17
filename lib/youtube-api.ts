@@ -13,6 +13,27 @@ declare global {
       getPlaylistVideos: (playlistId: string) => Promise<YTMusicVideo[]>;
       getLikedSongs: () => Promise<InnertubeTrack[]>;
       getHistory: () => Promise<InnertubeTrack[]>;
+      getLibraryPlaylists: () => Promise<LibraryPlaylistItem[]>;
+      getSubscriptions: () => Promise<SubscriptionItem[]>;
+      reportPlayback: (videoId: string) => Promise<{ success: boolean }>;
+      rateSong: (
+        videoId: string,
+        rating: "LIKE" | "DISLIKE" | "INDIFFERENT",
+      ) => Promise<{ success: boolean }>;
+      createPlaylist: (
+        title: string,
+        videoIds?: string[],
+      ) => Promise<{ success: boolean; playlistId?: string }>;
+      addToPlaylist: (
+        playlistId: string,
+        videoIds: string[],
+      ) => Promise<{ success: boolean }>;
+      removeFromPlaylist: (
+        playlistId: string,
+        videoIds: string[],
+        setVideoIds?: string[],
+      ) => Promise<{ success: boolean }>;
+      deletePlaylist: (playlistId: string) => Promise<{ success: boolean }>;
     };
   }
 }
@@ -27,6 +48,22 @@ interface InnertubeTrack {
   albumId: string;
   thumbnail: string;
   durationMs: number;
+}
+
+// Library playlist from innertube
+export interface LibraryPlaylistItem {
+  playlistId: string;
+  name: string;
+  subtitle: string;
+  thumbnail: string;
+}
+
+// Subscribed artist from innertube
+export interface SubscriptionItem {
+  channelId: string;
+  name: string;
+  subtitle: string;
+  thumbnail: string;
 }
 
 // ytmusic-api types (simplified for our needs)
@@ -225,7 +262,8 @@ export async function getYouTubeHomeSections(): Promise<
   return sections
     .map((section) => ({
       title: section.title,
-      tracks: section.contents
+      tracks: (section.contents || [])
+        .filter((item) => item != null)
         .map(homeItemToTrack)
         .filter((t): t is RakuTrack => t !== null),
     }))
@@ -249,6 +287,28 @@ export async function getYouTubeHistory(): Promise<RakuTrack[]> {
   try {
     const tracks = await window.ytmusicAPI.getHistory();
     return tracks.map(innertubeTrackToRaku);
+  } catch {
+    return [];
+  }
+}
+
+// ライブラリプレイリスト — playlists.list equivalent
+export async function getYouTubeLibraryPlaylists(): Promise<
+  LibraryPlaylistItem[]
+> {
+  if (!window.ytmusicAPI) return [];
+  try {
+    return await window.ytmusicAPI.getLibraryPlaylists();
+  } catch {
+    return [];
+  }
+}
+
+// サブスクリプション — subscriptions.list equivalent
+export async function getYouTubeSubscriptions(): Promise<SubscriptionItem[]> {
+  if (!window.ytmusicAPI) return [];
+  try {
+    return await window.ytmusicAPI.getSubscriptions();
   } catch {
     return [];
   }
@@ -309,5 +369,92 @@ export async function getYouTubePlaylistItems(
     return videos.map(videoToTrack);
   } catch {
     return [];
+  }
+}
+
+// --- Write operations ---
+
+// Report playback to YouTube (updates server-side history)
+export async function reportYouTubePlayback(videoId: string): Promise<boolean> {
+  if (!window.ytmusicAPI?.reportPlayback) return false;
+  try {
+    const result = await window.ytmusicAPI.reportPlayback(videoId);
+    return result.success;
+  } catch {
+    return false;
+  }
+}
+
+// Like / unlike a song on YouTube Music
+export async function rateYouTubeSong(
+  videoId: string,
+  rating: "LIKE" | "DISLIKE" | "INDIFFERENT",
+): Promise<boolean> {
+  if (!window.ytmusicAPI?.rateSong) return false;
+  try {
+    const result = await window.ytmusicAPI.rateSong(videoId, rating);
+    return result.success;
+  } catch {
+    return false;
+  }
+}
+
+// Create a new playlist on YouTube Music
+export async function createYouTubePlaylist(
+  title: string,
+  videoIds?: string[],
+): Promise<string | null> {
+  if (!window.ytmusicAPI?.createPlaylist) return null;
+  try {
+    const result = await window.ytmusicAPI.createPlaylist(title, videoIds);
+    return result.success ? result.playlistId || null : null;
+  } catch {
+    return null;
+  }
+}
+
+// Add songs to an existing YouTube Music playlist
+export async function addToYouTubePlaylist(
+  playlistId: string,
+  videoIds: string[],
+): Promise<boolean> {
+  if (!window.ytmusicAPI?.addToPlaylist) return false;
+  try {
+    const result = await window.ytmusicAPI.addToPlaylist(playlistId, videoIds);
+    return result.success;
+  } catch {
+    return false;
+  }
+}
+
+// Remove songs from a YouTube Music playlist
+export async function removeFromYouTubePlaylist(
+  playlistId: string,
+  videoIds: string[],
+  setVideoIds?: string[],
+): Promise<boolean> {
+  if (!window.ytmusicAPI?.removeFromPlaylist) return false;
+  try {
+    const result = await window.ytmusicAPI.removeFromPlaylist(
+      playlistId,
+      videoIds,
+      setVideoIds,
+    );
+    return result.success;
+  } catch {
+    return false;
+  }
+}
+
+// Delete a YouTube Music playlist
+export async function deleteYouTubePlaylist(
+  playlistId: string,
+): Promise<boolean> {
+  if (!window.ytmusicAPI?.deletePlaylist) return false;
+  try {
+    const result = await window.ytmusicAPI.deletePlaylist(playlistId);
+    return result.success;
+  } catch {
+    return false;
   }
 }

@@ -116,6 +116,11 @@ export const translations = {
     en: "Listen Again",
     ko: "다시 듣기",
   },
+  "home.subscriptions": {
+    ja: "登録チャンネル",
+    en: "Your Subscriptions",
+    ko: "구독 채널",
+  },
   "home.viewAll": {
     ja: "すべて表示",
     en: "View all",

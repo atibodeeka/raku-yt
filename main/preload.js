@@ -29,6 +29,25 @@ contextBridge.exposeInMainWorld("ytmusicAPI", {
     ipcRenderer.invoke("ytmusic:getSearchSuggestions", query),
   getLikedSongs: () => ipcRenderer.invoke("ytmusic:getLikedSongs"),
   getHistory: () => ipcRenderer.invoke("ytmusic:getHistory"),
+  getLibraryPlaylists: () => ipcRenderer.invoke("ytmusic:getLibraryPlaylists"),
+  getSubscriptions: () => ipcRenderer.invoke("ytmusic:getSubscriptions"),
+  reportPlayback: (videoId) =>
+    ipcRenderer.invoke("ytmusic:reportPlayback", videoId),
+  rateSong: (videoId, rating) =>
+    ipcRenderer.invoke("ytmusic:rateSong", videoId, rating),
+  createPlaylist: (title, videoIds) =>
+    ipcRenderer.invoke("ytmusic:createPlaylist", title, videoIds),
+  addToPlaylist: (playlistId, videoIds) =>
+    ipcRenderer.invoke("ytmusic:addToPlaylist", playlistId, videoIds),
+  removeFromPlaylist: (playlistId, videoIds, setVideoIds) =>
+    ipcRenderer.invoke(
+      "ytmusic:removeFromPlaylist",
+      playlistId,
+      videoIds,
+      setVideoIds,
+    ),
+  deletePlaylist: (playlistId) =>
+    ipcRenderer.invoke("ytmusic:deletePlaylist", playlistId),
 });
 
 contextBridge.exposeInMainWorld("ytdlpAPI", {

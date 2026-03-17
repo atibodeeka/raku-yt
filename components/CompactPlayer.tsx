@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
 import { t } from "@/lib/i18n";
 import { formatTime } from "@/lib/utils";
-import { searchYouTubeTracks } from "@/lib/youtube-api";
+import {
+  searchYouTubeTracks,
+  rateYouTubeSong,
+  addToYouTubePlaylist,
+  createYouTubePlaylist,
+  getYouTubeLibraryPlaylists,
+} from "@/lib/youtube-api";
+import type { LibraryPlaylistItem } from "@/lib/youtube-api";
 import {
   FiPlay,
   FiPause,
@@ -18,6 +25,8 @@ import {
   FiX,
   FiVolume2,
   FiVolumeX,
+  FiHeart,
+  FiMusic,
 } from "react-icons/fi";
 
 interface CompactPlayerProps {
@@ -68,6 +77,88 @@ export default function CompactPlayer({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<RakuTrack[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // Like state
+  const [isLiked, setIsLiked] = useState(false);
+  const [likingInProgress, setLikingInProgress] = useState(false);
+
+  // Playlist menu state
+  const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
+  const [playlists, setPlaylists] = useState<LibraryPlaylistItem[]>([]);
+  const [showCreateInput, setShowCreateInput] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const playlistMenuRef = useRef<HTMLDivElement>(null);
+
+  // Reset like state when track changes
+  useEffect(() => {
+    setIsLiked(false);
+  }, [currentTrack?.id]);
+
+  // Close playlist menu on outside click
+  useEffect(() => {
+    if (!showPlaylistMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        playlistMenuRef.current &&
+        !playlistMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowPlaylistMenu(false);
+        setShowCreateInput(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showPlaylistMenu]);
+
+  const handleLike = async () => {
+    if (!currentTrack || likingInProgress) return;
+    setLikingInProgress(true);
+    const newRating = isLiked ? "INDIFFERENT" : "LIKE";
+    const ok = await rateYouTubeSong(currentTrack.id, newRating);
+    if (ok) {
+      setIsLiked(!isLiked);
+      showToast(isLiked ? "Removed from liked songs" : "Added to liked songs");
+    } else {
+      showToast("Failed to update like");
+    }
+    setLikingInProgress(false);
+  };
+
+  const handleOpenPlaylistMenu = async () => {
+    if (showPlaylistMenu) {
+      setShowPlaylistMenu(false);
+      return;
+    }
+    const pls = await getYouTubeLibraryPlaylists();
+    setPlaylists(pls);
+    setShowPlaylistMenu(true);
+  };
+
+  const handleAddToPlaylist = async (playlistId: string) => {
+    if (!currentTrack) return;
+    const ok = await addToYouTubePlaylist(playlistId, [currentTrack.id]);
+    if (ok) {
+      showToast("Added to playlist");
+    } else {
+      showToast("Failed to add to playlist");
+    }
+    setShowPlaylistMenu(false);
+  };
+
+  const handleCreatePlaylist = async () => {
+    if (!currentTrack || !newPlaylistName.trim()) return;
+    const playlistId = await createYouTubePlaylist(newPlaylistName.trim(), [
+      currentTrack.id,
+    ]);
+    if (playlistId) {
+      showToast(`Created "${newPlaylistName.trim()}" and added song`);
+    } else {
+      showToast("Failed to create playlist");
+    }
+    setNewPlaylistName("");
+    setShowCreateInput(false);
+    setShowPlaylistMenu(false);
+  };
 
   const handleVolumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseInt(e.target.value, 10);
@@ -229,19 +320,107 @@ export default function CompactPlayer({
           <span>{formatTime(progress)}</span>
           <span>{formatTime(duration)}</span>
         </div>
-        {/* Volume */}
-        <div className="flex items-center gap-1.5 ml-auto mt-3 mr-[50px] w-24">
-          <button className="text-gray-400">
-            {volume === 0 ? <FiVolumeX size={10} /> : <FiVolume2 size={10} />}
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={volume}
-            onChange={handleVolumeChange}
-            className="flex-1 compact-range"
-          />
+        {/* Like, Add to Playlist & Volume */}
+        <div className="flex items-center gap-2 mt-3 relative">
+          {currentTrack && (
+            <>
+              <button
+                onClick={handleLike}
+                disabled={likingInProgress}
+                className={`p-1 rounded transition-colors ${
+                  isLiked ? "text-red-400" : "text-gray-500 hover:text-red-400"
+                } disabled:opacity-50`}
+                title={isLiked ? "Unlike" : "Like"}>
+                <FiHeart size={12} className={isLiked ? "fill-current" : ""} />
+              </button>
+              <button
+                onClick={handleOpenPlaylistMenu}
+                className={`p-1 rounded transition-colors ${
+                  showPlaylistMenu
+                    ? "text-melon-green"
+                    : "text-gray-500 hover:text-melon-green"
+                }`}
+                title="Add to playlist">
+                <FiPlus size={12} />
+              </button>
+              {showPlaylistMenu && (
+                <div
+                  ref={playlistMenuRef}
+                  className="absolute left-0 bottom-full mb-2 w-48 bg-[#2a2a2a] border border-gray-600 rounded-lg shadow-xl z-50 py-1 max-h-52 overflow-y-auto">
+                  {showCreateInput ? (
+                    <div className="flex items-center gap-1 px-2 py-1.5">
+                      <input
+                        autoFocus
+                        value={newPlaylistName}
+                        onChange={(e) => setNewPlaylistName(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleCreatePlaylist()
+                        }
+                        placeholder="Playlist name"
+                        className="flex-1 bg-[#333] border border-gray-600 rounded px-1.5 py-0.5 text-[10px] text-gray-200 placeholder-gray-500 focus:outline-none focus:border-melon-green"
+                      />
+                      <button
+                        onClick={handleCreatePlaylist}
+                        className="text-[10px] text-melon-green hover:text-melon-darkgreen font-medium px-1">
+                        OK
+                      </button>
+                      <button
+                        onClick={() => setShowCreateInput(false)}
+                        className="text-gray-400 hover:text-gray-200">
+                        <FiX size={10} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowCreateInput(true)}
+                      className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-white/10 flex items-center gap-2 text-melon-green font-medium">
+                      <FiPlus size={10} />
+                      New playlist
+                    </button>
+                  )}
+                  <div className="border-t border-gray-600 my-0.5" />
+                  {playlists.length === 0 ? (
+                    <div className="px-3 py-2 text-[10px] text-gray-500">
+                      No playlists found
+                    </div>
+                  ) : (
+                    playlists.map((pl) => (
+                      <button
+                        key={pl.playlistId}
+                        onClick={() => handleAddToPlaylist(pl.playlistId)}
+                        className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-white/10 flex items-center gap-2 truncate text-gray-300">
+                        {pl.thumbnail ? (
+                          <img
+                            src={pl.thumbnail}
+                            alt=""
+                            className="w-5 h-5 rounded object-cover shrink-0"
+                          />
+                        ) : (
+                          <div className="w-5 h-5 rounded bg-gray-700 flex items-center justify-center shrink-0">
+                            <FiMusic size={8} className="text-gray-500" />
+                          </div>
+                        )}
+                        <span className="truncate">{pl.name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          <div className="flex items-center gap-1.5 ml-auto w-auto">
+            <button className="text-gray-400">
+              {volume === 0 ? <FiVolumeX size={10} /> : <FiVolume2 size={10} />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              onChange={handleVolumeChange}
+              className="flex-1 compact-range"
+            />
+          </div>
         </div>
       </div>
 

@@ -11,6 +11,7 @@ import { FiClock } from "react-icons/fi";
 
 export default function HistoryPage() {
   const isLoggedIn = useStore((s) => s.isLoggedIn);
+  const currentPage = useStore((s) => s.currentPage);
   const [tracks, setTracks] = useState<RakuTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const language = useStore((s) => s.language);
@@ -28,9 +29,12 @@ export default function HistoryPage() {
     }
   }, [isLoggedIn]);
 
+  // Refetch every time user navigates to this page
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+    if (currentPage === "history") {
+      fetchHistory();
+    }
+  }, [currentPage, fetchHistory]);
 
   return (
     <div className="p-6">

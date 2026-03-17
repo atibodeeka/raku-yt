@@ -83,8 +83,8 @@ async function ytMusicBrowse(browseId, additionalBody = {}) {
       client: {
         clientName: "WEB_REMIX",
         clientVersion: "1.20260311.03.00",
-        hl: "ja",
-        gl: "JP",
+        hl: "th",
+        gl: "TH",
       },
     },
     browseId,
@@ -192,8 +192,8 @@ async function checkPremiumStatus() {
           client: {
             clientName: "WEB_REMIX",
             clientVersion: "1.20260311.03.00",
-            hl: "ja",
-            gl: "JP",
+            hl: "th",
+            gl: "TH",
           },
         },
         videoId: testVideoId,
@@ -239,7 +239,7 @@ async function checkPremiumStatus() {
 
 async function initYTMusic() {
   ytmusic = new YTMusic();
-  await ytmusic.initialize({ GL: "JP", HL: "ja" });
+  await ytmusic.initialize({ GL: "TH", HL: "th" });
 }
 
 // Fetch the logged-in user's name and avatar via innertube account_menu endpoint
@@ -263,8 +263,8 @@ async function fetchAccountInfo() {
         client: {
           clientName: "WEB_REMIX",
           clientVersion: "1.20260311.03.00",
-          hl: "ja",
-          gl: "JP",
+          hl: "th",
+          gl: "TH",
         },
       },
     };
@@ -514,7 +514,14 @@ ipcMain.handle("ytmusic:searchVideos", async (_event, query) => {
 
 ipcMain.handle("ytmusic:getHomeSections", async () => {
   if (!ytmusic) return [];
-  return ytmusic.getHomeSections();
+  const sections = await ytmusic.getHomeSections();
+  // Filter out null entries from contents (some regions return nulls for unrecognized page types)
+  return sections
+    .map((s) => ({
+      ...s,
+      contents: (s.contents || []).filter((item) => item != null),
+    }))
+    .filter((s) => s.contents.length > 0);
 });
 
 ipcMain.handle("ytmusic:getArtist", async (_event, artistId) => {
@@ -554,8 +561,8 @@ async function getAudioUrlFromInnertube(videoId) {
       client: {
         clientName: "WEB_REMIX",
         clientVersion: "1.20260311.03.00",
-        hl: "ja",
-        gl: "JP",
+        hl: "th",
+        gl: "TH",
       },
     },
     videoId,
@@ -817,7 +824,7 @@ ipcMain.handle("youtube:logout", async () => {
     audioUrlCache.clear();
     // Re-init ytmusic without cookies (for search/public features)
     ytmusic = new YTMusic();
-    await ytmusic.initialize({ GL: "JP", HL: "ja" });
+    await ytmusic.initialize({ GL: "TH", HL: "th" });
   } catch (e) {
     console.error("Logout error:", e);
   }
@@ -944,6 +951,528 @@ ipcMain.handle("youtube:isPremium", async () => {
     return false;
   }
 });
+
+// --- YouTube Data API equivalents via innertube + session cookies ---
+
+// playlists.list equivalent: get user's library playlists
+ipcMain.handle("ytmusic:getLibraryPlaylists", async () => {
+  const playlists = [];
+  const seenIds = new Set();
+
+  // Helper: extract a playlist item from musicTwoRowItemRenderer
+  function parseTwoRowItem(r) {
+    const titleRuns = r.title?.runs || [];
+    const name = titleRuns[0]?.text || "";
+    const playlistId =
+      r.navigationEndpoint?.browseEndpoint?.browseId ||
+      titleRuns[0]?.navigationEndpoint?.browseEndpoint?.browseId ||
+      "";
+    const subtitleRuns = r.subtitle?.runs || [];
+    const subtitle = subtitleRuns.map((sr) => sr.text).join("");
+    const thumbs =
+      r.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+    const thumb = thumbs[thumbs.length - 1]?.url || "";
+    if (playlistId && name && !seenIds.has(playlistId)) {
+      seenIds.add(playlistId);
+      playlists.push({ playlistId, name, subtitle, thumbnail: thumb });
+    }
+  }
+
+  // Helper: extract a playlist item from musicResponsiveListItemRenderer
+  function parseResponsiveItem(r) {
+    const titleRuns =
+      r.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text
+        ?.runs || [];
+    const name = titleRuns[0]?.text || "";
+    const playlistId =
+      r.navigationEndpoint?.browseEndpoint?.browseId ||
+      titleRuns[0]?.navigationEndpoint?.browseEndpoint?.browseId ||
+      r.overlay?.musicItemThumbnailOverlayRenderer?.content
+        ?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchPlaylistEndpoint
+        ?.playlistId ||
+      "";
+    const subtitleRuns =
+      r.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer?.text
+        ?.runs || [];
+    const subtitle = subtitleRuns.map((sr) => sr.text).join("");
+    const thumbs =
+      r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+    const thumb = thumbs[thumbs.length - 1]?.url || "";
+    if (playlistId && name && !seenIds.has(playlistId)) {
+      seenIds.add(playlistId);
+      playlists.push({ playlistId, name, subtitle, thumbnail: thumb });
+    }
+  }
+
+  // Deep recursive search for playlist renderers
+  function deepSearch(obj, depth) {
+    if (!obj || typeof obj !== "object" || depth > 15) return;
+    if (obj.musicTwoRowItemRenderer) {
+      parseTwoRowItem(obj.musicTwoRowItemRenderer);
+    }
+    if (obj.musicResponsiveListItemRenderer) {
+      parseResponsiveItem(obj.musicResponsiveListItemRenderer);
+    }
+    for (const val of Object.values(obj)) {
+      if (val && typeof val === "object") {
+        deepSearch(val, depth + 1);
+      }
+    }
+  }
+
+  // Try multiple browse IDs — different accounts/regions use different ones
+  const browseIds = [
+    "FEmusic_liked_playlists",
+    "FEmusic_library_privately_owned_playlists",
+  ];
+
+  for (const browseId of browseIds) {
+    if (playlists.length > 0) break;
+    try {
+      const data = await ytMusicBrowse(browseId);
+      deepSearch(data, 0);
+    } catch (e) {
+      console.warn(`[LibraryPlaylists] ${browseId} failed:`, e.message);
+    }
+  }
+
+  // If browse endpoints didn't work, try scraping the library page directly
+  if (playlists.length === 0) {
+    try {
+      console.log(
+        `[LibraryPlaylists] Browse endpoints failed, trying library page scrape...`,
+      );
+      const loginSession = getLoginSession();
+      const sapisid = await getSAPISID();
+      if (sapisid) {
+        const authorization = generateSAPISIDHash(sapisid);
+        const resp = await loginSession.fetch(
+          "https://music.youtube.com/library/playlists",
+          {
+            method: "GET",
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Accept: "text/html",
+              Referer: "https://music.youtube.com/",
+            },
+          },
+        );
+        if (resp.ok) {
+          const html = await resp.text();
+          // Extract ytInitialData from the page
+          const dataMatch = html.match(
+            /var ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s,
+          );
+          if (dataMatch) {
+            try {
+              const pageData = JSON.parse(dataMatch[1]);
+              console.log(
+                `[LibraryPlaylists] Page scrape: parsed ytInitialData`,
+              );
+              deepSearch(pageData, 0);
+              if (playlists.length > 0) {
+                console.log(
+                  `[LibraryPlaylists] Page scrape found ${playlists.length} playlists`,
+                );
+              }
+            } catch {
+              console.warn("[LibraryPlaylists] Failed to parse ytInitialData");
+            }
+          }
+
+          // Also try regex extraction from raw HTML
+          if (playlists.length === 0) {
+            const playlistMatches = [
+              ...html.matchAll(
+                /\"playlistId\"\s*:\s*\"((?:PL|OL|RDCL)[A-Za-z0-9_-]+)\"/g,
+              ),
+            ];
+            const titleContext = html;
+            for (const m of playlistMatches) {
+              const pid = m[1];
+              const vlId = `VL${pid}`;
+              if (!seenIds.has(pid) && !seenIds.has(vlId)) {
+                seenIds.add(pid);
+                seenIds.add(vlId);
+                // Try to find nearby title
+                const pos = titleContext.indexOf(pid);
+                const nearby = titleContext.slice(Math.max(0, pos - 1000), pos);
+                const nameMatch = nearby.match(/"text"\s*:\s*"([^"]{1,100})"/g);
+                const name = nameMatch
+                  ? nameMatch[nameMatch.length - 1].match(
+                      /"text"\s*:\s*"([^"]+)"/,
+                    )?.[1] || `Playlist`
+                  : `Playlist`;
+                playlists.push({
+                  playlistId: `VL${pid}`,
+                  name,
+                  subtitle: "",
+                  thumbnail: "",
+                });
+              }
+            }
+            if (playlists.length > 0) {
+              console.log(
+                `[LibraryPlaylists] HTML regex found ${playlists.length} playlists`,
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[LibraryPlaylists] Page scrape failed:", e.message);
+    }
+  }
+
+  console.log(`[LibraryPlaylists] Final result: ${playlists.length} playlists`);
+  return playlists;
+});
+
+// subscriptions.list equivalent: get user's subscribed artist channels
+ipcMain.handle("ytmusic:getSubscriptions", async () => {
+  try {
+    const data = await ytMusicBrowse("FEmusic_library_corpus_artists");
+    const artists = [];
+
+    const tabs = data?.contents?.singleColumnBrowseResultsRenderer?.tabs || [];
+    for (const tab of tabs) {
+      const sections =
+        tab.tabRenderer?.content?.sectionListRenderer?.contents || [];
+      for (const section of sections) {
+        const items =
+          section.musicShelfRenderer?.contents ||
+          section.gridRenderer?.items ||
+          [];
+        for (const item of items) {
+          // musicResponsiveListItemRenderer (list layout)
+          if (item.musicResponsiveListItemRenderer) {
+            const r = item.musicResponsiveListItemRenderer;
+            const titleRuns =
+              r.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer
+                ?.text?.runs || [];
+            const name = titleRuns[0]?.text || "";
+            const browseId =
+              r.navigationEndpoint?.browseEndpoint?.browseId ||
+              titleRuns[0]?.navigationEndpoint?.browseEndpoint?.browseId ||
+              "";
+            const thumbs =
+              r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+            const thumb = thumbs[thumbs.length - 1]?.url || "";
+            const subtitleRuns =
+              r.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer
+                ?.text?.runs || [];
+            const subtitle = subtitleRuns.map((sr) => sr.text).join("");
+            if (browseId && name) {
+              artists.push({
+                channelId: browseId,
+                name,
+                subtitle,
+                thumbnail: thumb,
+              });
+            }
+          }
+          // musicTwoRowItemRenderer (grid layout)
+          if (item.musicTwoRowItemRenderer) {
+            const r = item.musicTwoRowItemRenderer;
+            const titleRuns = r.title?.runs || [];
+            const name = titleRuns[0]?.text || "";
+            const browseId =
+              r.navigationEndpoint?.browseEndpoint?.browseId || "";
+            const subtitleRuns = r.subtitle?.runs || [];
+            const subtitle = subtitleRuns.map((sr) => sr.text).join("");
+            const thumbs =
+              r.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail
+                ?.thumbnails || [];
+            const thumb = thumbs[thumbs.length - 1]?.url || "";
+            if (browseId && name) {
+              artists.push({
+                channelId: browseId,
+                name,
+                subtitle,
+                thumbnail: thumb,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`[Subscriptions] Found ${artists.length} subscribed artists`);
+    return artists;
+  } catch (e) {
+    console.warn("Failed to get subscriptions:", e.message);
+    return [];
+  }
+});
+
+// --- Write operations via innertube ---
+
+// Report playback to YouTube (so it appears in history)
+// Uses the tracking URLs from the /player response, which is how the real YouTube Music web client works
+ipcMain.handle("ytmusic:reportPlayback", async (_event, videoId) => {
+  try {
+    const body = {
+      context: {
+        client: {
+          clientName: "WEB_REMIX",
+          clientVersion: "1.20260311.03.00",
+          hl: "th",
+          gl: "TH",
+        },
+      },
+      videoId,
+      playbackContext: {
+        contentPlaybackContext: {
+          signatureTimestamp: 20073,
+        },
+      },
+    };
+    // Call /player to get the video info and tracking URLs
+    const data = await ytMusicFetch(
+      "https://music.youtube.com/youtubei/v1/player?alt=json",
+      body,
+    );
+
+    // Extract tracking URLs from the player response
+    const playbackUrl = data?.playbackTracking?.videostatsPlaybackUrl?.baseUrl;
+    const watchtimeUrl =
+      data?.playbackTracking?.videostatsWatchtimeUrl?.baseUrl;
+
+    const loginSession = getLoginSession();
+    const cpn = generateCPN();
+
+    // Call the playback tracking URL (registers the view/play start)
+    if (playbackUrl) {
+      try {
+        const pbUrl = new URL(playbackUrl);
+        pbUrl.searchParams.set("cpn", cpn);
+        pbUrl.searchParams.set("ver", "2");
+        pbUrl.searchParams.set("c", "WEB_REMIX");
+        pbUrl.searchParams.set("cver", "1.20260311.03.00");
+        await loginSession.fetch(pbUrl.toString(), {
+          method: "GET",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Referer: "https://music.youtube.com/",
+          },
+        });
+      } catch (e) {
+        console.warn("Playback tracking URL failed:", e.message);
+      }
+    }
+
+    // Call the watchtime tracking URL with a small amount of watch time
+    // This is what actually registers the video in YouTube history
+    if (watchtimeUrl) {
+      try {
+        const wtUrl = new URL(watchtimeUrl);
+        wtUrl.searchParams.set("cpn", cpn);
+        wtUrl.searchParams.set("ver", "2");
+        wtUrl.searchParams.set("c", "WEB_REMIX");
+        wtUrl.searchParams.set("cver", "1.20260311.03.00");
+        wtUrl.searchParams.set("st", "0");
+        wtUrl.searchParams.set("et", "30");
+        wtUrl.searchParams.set("cmt", "30");
+        wtUrl.searchParams.set("lact", "1000");
+        wtUrl.searchParams.set("fmt", "251");
+        await loginSession.fetch(wtUrl.toString(), {
+          method: "GET",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Referer: "https://music.youtube.com/",
+          },
+        });
+      } catch (e) {
+        console.warn("Watchtime tracking URL failed:", e.message);
+      }
+    }
+
+    console.log(`[Playback] Reported playback for ${videoId}`);
+    return { success: true };
+  } catch (e) {
+    console.warn("Failed to report playback:", e.message);
+    return { success: false, error: e.message };
+  }
+});
+
+// Like/unlike a song (rate endpoint)
+ipcMain.handle("ytmusic:rateSong", async (_event, videoId, rating) => {
+  // rating: "LIKE", "DISLIKE", or "INDIFFERENT" (remove rating)
+  try {
+    const body = {
+      context: {
+        client: {
+          clientName: "WEB_REMIX",
+          clientVersion: "1.20260311.03.00",
+          hl: "th",
+          gl: "TH",
+        },
+      },
+      target: { videoId },
+    };
+    const endpoint =
+      rating === "LIKE"
+        ? "like"
+        : rating === "DISLIKE"
+          ? "dislike"
+          : "removelike";
+    await ytMusicFetch(
+      `https://music.youtube.com/youtubei/v1/like/${endpoint}?alt=json`,
+      body,
+    );
+    console.log(`[Rate] ${rating} for ${videoId}`);
+    return { success: true };
+  } catch (e) {
+    console.warn("Failed to rate song:", e.message);
+    return { success: false, error: e.message };
+  }
+});
+
+// Create a new playlist
+ipcMain.handle("ytmusic:createPlaylist", async (_event, title, videoIds) => {
+  try {
+    const body = {
+      context: {
+        client: {
+          clientName: "WEB_REMIX",
+          clientVersion: "1.20260311.03.00",
+          hl: "th",
+          gl: "TH",
+        },
+      },
+      title,
+      privacyStatus: "PRIVATE",
+      videoIds: videoIds || [],
+    };
+    const data = await ytMusicFetch(
+      "https://music.youtube.com/youtubei/v1/playlist/create?alt=json",
+      body,
+    );
+    const playlistId = data?.playlistId;
+    console.log(`[Playlist] Created playlist: ${title} (${playlistId})`);
+    return { success: true, playlistId };
+  } catch (e) {
+    console.warn("Failed to create playlist:", e.message);
+    return { success: false, error: e.message };
+  }
+});
+
+// Add songs to an existing playlist
+ipcMain.handle(
+  "ytmusic:addToPlaylist",
+  async (_event, playlistId, videoIds) => {
+    try {
+      const actions = videoIds.map((id) => ({
+        action: "ACTION_ADD_VIDEO",
+        addedVideoId: id,
+      }));
+      const body = {
+        context: {
+          client: {
+            clientName: "WEB_REMIX",
+            clientVersion: "1.20260311.03.00",
+            hl: "th",
+            gl: "TH",
+          },
+        },
+        playlistId: playlistId.startsWith("VL")
+          ? playlistId.slice(2)
+          : playlistId,
+        actions,
+      };
+      await ytMusicFetch(
+        "https://music.youtube.com/youtubei/v1/browse/edit_playlist?alt=json",
+        body,
+      );
+      console.log(`[Playlist] Added ${videoIds.length} songs to ${playlistId}`);
+      return { success: true };
+    } catch (e) {
+      console.warn("Failed to add to playlist:", e.message);
+      return { success: false, error: e.message };
+    }
+  },
+);
+
+// Remove songs from a playlist
+ipcMain.handle(
+  "ytmusic:removeFromPlaylist",
+  async (_event, playlistId, videoIds, setVideoIds) => {
+    try {
+      const actions = videoIds.map((id, i) => ({
+        action: "ACTION_REMOVE_VIDEO",
+        removedVideoId: id,
+        setVideoId: setVideoIds?.[i] || undefined,
+      }));
+      const body = {
+        context: {
+          client: {
+            clientName: "WEB_REMIX",
+            clientVersion: "1.20260311.03.00",
+            hl: "th",
+            gl: "TH",
+          },
+        },
+        playlistId: playlistId.startsWith("VL")
+          ? playlistId.slice(2)
+          : playlistId,
+        actions,
+      };
+      await ytMusicFetch(
+        "https://music.youtube.com/youtubei/v1/browse/edit_playlist?alt=json",
+        body,
+      );
+      console.log(
+        `[Playlist] Removed ${videoIds.length} songs from ${playlistId}`,
+      );
+      return { success: true };
+    } catch (e) {
+      console.warn("Failed to remove from playlist:", e.message);
+      return { success: false, error: e.message };
+    }
+  },
+);
+
+// Delete a playlist
+ipcMain.handle("ytmusic:deletePlaylist", async (_event, playlistId) => {
+  try {
+    const body = {
+      context: {
+        client: {
+          clientName: "WEB_REMIX",
+          clientVersion: "1.20260311.03.00",
+          hl: "th",
+          gl: "TH",
+        },
+      },
+      playlistId: playlistId.startsWith("VL")
+        ? playlistId.slice(2)
+        : playlistId,
+    };
+    await ytMusicFetch(
+      "https://music.youtube.com/youtubei/v1/playlist/delete?alt=json",
+      body,
+    );
+    console.log(`[Playlist] Deleted playlist ${playlistId}`);
+    return { success: true };
+  } catch (e) {
+    console.warn("Failed to delete playlist:", e.message);
+    return { success: false, error: e.message };
+  }
+});
+
+// Generate a CPN (client playback nonce) for playback reporting
+function generateCPN() {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  let cpn = "";
+  for (let i = 0; i < 16; i++) {
+    cpn += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return cpn;
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

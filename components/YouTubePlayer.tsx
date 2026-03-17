@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useStore } from "@/lib/store";
+import { reportYouTubePlayback } from "@/lib/youtube-api";
 import { t } from "@/lib/i18n";
 
 declare global {
@@ -147,6 +148,8 @@ export function useYouTubePlayer(onEnded?: () => void) {
           useStore.getState().setIsLoadingTrack(false);
           try {
             await audio.play();
+            // Report playback to YouTube so it appears in server-side history
+            reportYouTubePlayback(videoId).catch(() => {});
           } catch (playErr: unknown) {
             // Ignore AbortError (play interrupted by pause/new track)
             if (

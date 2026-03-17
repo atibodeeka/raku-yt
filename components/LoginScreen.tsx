@@ -66,7 +66,7 @@ export default function LoginScreen() {
           ))}
         </p>
 
-        {/* Login button */}
+        {/* Login button  button*/}
         <div className="flex flex-col gap-3 items-center">
           <button
             onClick={handleLogin}

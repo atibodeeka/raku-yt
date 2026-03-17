@@ -116,6 +116,15 @@ export default function Home() {
         });
       }
     });
+    // Sync compact mode with Electron window on startup
+    const { compactMode: savedCompact } = useStore.getState();
+    if (savedCompact && window.electronAPI) {
+      const api = window.electronAPI as {
+        setCompactMode?: (c: boolean) => void;
+      };
+      api.setCompactMode?.(true);
+    }
+
     setMounted(true);
   }, []);
 

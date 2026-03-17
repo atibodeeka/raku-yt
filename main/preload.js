@@ -17,6 +17,11 @@ contextBridge.exposeInMainWorld("youtubeAuth", {
 contextBridge.exposeInMainWorld("ytmusicAPI", {
   searchSongs: (query) => ipcRenderer.invoke("ytmusic:searchSongs", query),
   searchVideos: (query) => ipcRenderer.invoke("ytmusic:searchVideos", query),
+  search: (query) => ipcRenderer.invoke("ytmusic:search", query),
+  searchArtists: (query) => ipcRenderer.invoke("ytmusic:searchArtists", query),
+  searchAlbums: (query) => ipcRenderer.invoke("ytmusic:searchAlbums", query),
+  searchPlaylists: (query) =>
+    ipcRenderer.invoke("ytmusic:searchPlaylists", query),
   getHomeSections: () => ipcRenderer.invoke("ytmusic:getHomeSections"),
   getArtist: (artistId) => ipcRenderer.invoke("ytmusic:getArtist", artistId),
   getArtistSongs: (artistId) =>

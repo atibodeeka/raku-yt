@@ -18,7 +18,7 @@ export interface RakuTrack {
   uri: string;
   preview_url: string | null;
   provider: Provider;
-  itemType?: "song" | "album" | "playlist";
+  itemType?: "song" | "album" | "playlist" | "video" | "artist";
 }
 
 export interface RakuUser {
@@ -47,6 +47,7 @@ interface PlayerState {
   // UI
   currentPage: string;
   searchQuery: string;
+  searchFilter: "all" | "songs" | "videos" | "albums" | "artists" | "playlists";
 
   // Settings
   language: Language;
@@ -75,6 +76,9 @@ interface PlayerState {
   setRepeat: (repeat: "off" | "context" | "track") => void;
   setCurrentPage: (page: string) => void;
   setSearchQuery: (query: string) => void;
+  setSearchFilter: (
+    filter: "all" | "songs" | "videos" | "albums" | "artists" | "playlists",
+  ) => void;
   setQueue: (tracks: RakuTrack[], startIndex?: number) => void;
   setQueueIndex: (index: number) => void;
   addToQueue: (track: RakuTrack) => void;
@@ -117,12 +121,13 @@ export const useStore = create<PlayerState>((set) => ({
   // UI
   currentPage: "home",
   searchQuery: "",
+  searchFilter: "all" as const,
 
   // Settings (load from localStorage)
   language:
     (typeof window !== "undefined"
       ? (localStorage.getItem("raku_lang") as Language)
-      : null) || "ja",
+      : null) || "en",
   compactMode:
     typeof window !== "undefined"
       ? localStorage.getItem("raku_compact") === "true"
@@ -146,6 +151,12 @@ export const useStore = create<PlayerState>((set) => ({
       provider: null,
       isLoggedIn: false,
       user: null,
+      isPlaying: false,
+      currentTrack: null,
+      queue: [],
+      queueIndex: -1,
+      progress: 0,
+      duration: 0,
     }),
   setCurrentTrack: (track) => set({ currentTrack: track }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
@@ -157,6 +168,7 @@ export const useStore = create<PlayerState>((set) => ({
   setRepeat: (repeat) => set({ repeat }),
   setCurrentPage: (page) => set({ currentPage: page }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchFilter: (filter) => set({ searchFilter: filter }),
   setQueue: (tracks, startIndex = 0) =>
     set({ queue: tracks, queueIndex: startIndex }),
   setQueueIndex: (index) => set({ queueIndex: index }),

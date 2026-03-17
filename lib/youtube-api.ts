@@ -7,6 +7,11 @@ declare global {
   interface Window {
     ytmusicAPI?: {
       searchSongs: (query: string) => Promise<YTMusicSong[]>;
+      searchVideos: (query: string) => Promise<YTMusicVideo[]>;
+      search: (query: string) => Promise<YTMusicSearchResult[]>;
+      searchArtists: (query: string) => Promise<YTMusicArtistDetailed[]>;
+      searchAlbums: (query: string) => Promise<YTMusicAlbumDetailed[]>;
+      searchPlaylists: (query: string) => Promise<YTMusicPlaylistDetailed[]>;
       getHomeSections: () => Promise<YTMusicHomeSection[]>;
       getArtist: (artistId: string) => Promise<YTMusicArtist | null>;
       getArtistSongs: (artistId: string) => Promise<YTMusicSong[]>;
@@ -121,6 +126,39 @@ interface YTMusicArtist {
   thumbnails: YTMusicThumbnail[];
   topSongs: YTMusicSong[];
 }
+
+// Search result types for general search
+interface YTMusicArtistDetailed {
+  type: "ARTIST";
+  artistId: string;
+  name: string;
+  thumbnails: YTMusicThumbnail[];
+}
+
+interface YTMusicAlbumDetailed {
+  type: "ALBUM";
+  albumId: string;
+  playlistId: string;
+  name: string;
+  artist: { artistId: string | null; name: string };
+  year: number | null;
+  thumbnails: YTMusicThumbnail[];
+}
+
+interface YTMusicPlaylistDetailed {
+  type: "PLAYLIST";
+  playlistId: string;
+  name: string;
+  artist: { artistId: string | null; name: string };
+  thumbnails: YTMusicThumbnail[];
+}
+
+type YTMusicSearchResult =
+  | YTMusicSong
+  | (YTMusicVideo & { type: "VIDEO" })
+  | YTMusicArtistDetailed
+  | YTMusicAlbumDetailed
+  | YTMusicPlaylistDetailed;
 
 // Convert ytmusic-api song to unified RakuTrack
 function songToTrack(song: YTMusicSong): RakuTrack {
@@ -253,6 +291,182 @@ export async function searchYouTubeTracks(
   return songs.map(songToTrack);
 }
 
+// General search (all content types)
+export type SearchFilter =
+  | "all"
+  | "songs"
+  | "videos"
+  | "albums"
+  | "artists"
+  | "playlists";
+
+export async function searchYouTubeAll(
+  query: string,
+  filter: SearchFilter = "all",
+): Promise<RakuTrack[]> {
+  if (!window.ytmusicAPI) return [];
+
+  if (filter === "songs") {
+    const songs = await window.ytmusicAPI.searchSongs(query);
+    return songs.map((s) => {
+      const t = songToTrack(s);
+      t.itemType = "song";
+      return t;
+    });
+  }
+  if (filter === "videos") {
+    const videos = await window.ytmusicAPI.searchVideos(query);
+    return videos.map((v) => {
+      const t = videoToTrack(v);
+      t.itemType = "video";
+      return t;
+    });
+  }
+  if (filter === "artists") {
+    const artists = await window.ytmusicAPI.searchArtists(query);
+    return artists.map(artistSearchToTrack);
+  }
+  if (filter === "albums") {
+    const albums = await window.ytmusicAPI.searchAlbums(query);
+    return albums.map(albumSearchToTrack);
+  }
+  if (filter === "playlists") {
+    const playlists = await window.ytmusicAPI.searchPlaylists(query);
+    return playlists.map(playlistSearchToTrack);
+  }
+
+  // "all" — combine songs + videos for comprehensive results
+  // (ytmusic.search() returns 0 results for this region, so merge category searches)
+  const [songs, videos] = await Promise.all([
+    window.ytmusicAPI.searchSongs(query),
+    window.ytmusicAPI.searchVideos(query),
+  ]);
+  const songTracks = songs.map((s) => {
+    const t = songToTrack(s);
+    t.itemType = "song";
+    return t;
+  });
+  const videoTracks = videos.map((v) => {
+    const t = videoToTrack(v);
+    t.itemType = "video";
+    return t;
+  });
+  // Merge and deduplicate by videoId, songs first
+  const seen = new Set<string>();
+  const merged: RakuTrack[] = [];
+  for (const t of [...songTracks, ...videoTracks]) {
+    if (!seen.has(t.id)) {
+      seen.add(t.id);
+      merged.push(t);
+    }
+  }
+  return merged;
+}
+
+function searchResultToTrack(item: YTMusicSearchResult): RakuTrack | null {
+  if (item.type === "SONG") {
+    const t = songToTrack(item as YTMusicSong);
+    t.itemType = "song";
+    return t;
+  }
+  if (item.type === "VIDEO") {
+    const t = videoToTrack(item as YTMusicVideo);
+    t.itemType = "video";
+    return t;
+  }
+  if (item.type === "ARTIST") {
+    return artistSearchToTrack(item as YTMusicArtistDetailed);
+  }
+  if (item.type === "ALBUM") {
+    return albumSearchToTrack(item as YTMusicAlbumDetailed);
+  }
+  if (item.type === "PLAYLIST") {
+    return playlistSearchToTrack(item as YTMusicPlaylistDetailed);
+  }
+  return null;
+}
+
+function artistSearchToTrack(a: YTMusicArtistDetailed): RakuTrack {
+  return {
+    id: a.artistId,
+    name: a.name,
+    artists: [{ id: a.artistId, name: a.name }],
+    album: {
+      id: "",
+      name: "",
+      images:
+        a.thumbnails.length > 0
+          ? [
+              {
+                url: a.thumbnails[a.thumbnails.length - 1].url,
+                width: 480,
+                height: 480,
+              },
+            ]
+          : [],
+    },
+    duration_ms: 0,
+    uri: a.artistId,
+    preview_url: null,
+    provider: "youtube",
+    itemType: "artist",
+  };
+}
+
+function albumSearchToTrack(a: YTMusicAlbumDetailed): RakuTrack {
+  return {
+    id: a.playlistId || a.albumId,
+    name: a.name,
+    artists: [{ id: a.artist.artistId || "", name: a.artist.name }],
+    album: {
+      id: a.albumId,
+      name: a.name,
+      images:
+        a.thumbnails.length > 0
+          ? [
+              {
+                url: a.thumbnails[a.thumbnails.length - 1].url,
+                width: 480,
+                height: 480,
+              },
+            ]
+          : [],
+    },
+    duration_ms: 0,
+    uri: a.playlistId || a.albumId,
+    preview_url: null,
+    provider: "youtube",
+    itemType: "album",
+  };
+}
+
+function playlistSearchToTrack(p: YTMusicPlaylistDetailed): RakuTrack {
+  return {
+    id: p.playlistId,
+    name: p.name,
+    artists: [{ id: p.artist.artistId || "", name: p.artist.name }],
+    album: {
+      id: "",
+      name: p.name,
+      images:
+        p.thumbnails.length > 0
+          ? [
+              {
+                url: p.thumbnails[p.thumbnails.length - 1].url,
+                width: 480,
+                height: 480,
+              },
+            ]
+          : [],
+    },
+    duration_ms: 0,
+    uri: p.playlistId,
+    preview_url: null,
+    provider: "youtube",
+    itemType: "playlist",
+  };
+}
+
 // ホームセクション取得 (via ytmusic-api)
 export async function getYouTubeHomeSections(): Promise<
   { title: string; tracks: RakuTrack[] }[]
@@ -373,6 +587,68 @@ export async function getYouTubePlaylistItems(
 }
 
 // --- Write operations ---
+
+/**
+ * Parse a YouTube URL and extract the video ID.
+ * Supports youtube.com/watch, youtu.be, music.youtube.com/watch, youtube.com/shorts, etc.
+ * Returns null if the input is not a valid YouTube URL.
+ */
+export function parseYouTubeUrl(input: string): string | null {
+  const trimmed = input.trim();
+  try {
+    const url = new URL(trimmed);
+    const host = url.hostname.replace(/^www\./, "");
+    if (
+      host === "youtube.com" ||
+      host === "music.youtube.com" ||
+      host === "m.youtube.com"
+    ) {
+      // /watch?v=VIDEO_ID
+      const v = url.searchParams.get("v");
+      if (v && /^[\w-]{11}$/.test(v)) return v;
+      // /shorts/VIDEO_ID or /embed/VIDEO_ID
+      const pathMatch = url.pathname.match(/^\/(shorts|embed)\/([\w-]{11})/);
+      if (pathMatch) return pathMatch[2];
+      return null;
+    }
+    if (host === "youtu.be") {
+      const id = url.pathname.slice(1).split("/")[0];
+      if (/^[\w-]{11}$/.test(id)) return id;
+      return null;
+    }
+  } catch {
+    // not a valid URL
+  }
+  return null;
+}
+
+/**
+ * Create a minimal RakuTrack from a video ID (for direct URL playback).
+ * The track will have placeholder metadata that gets shown until playback starts.
+ */
+export function createTrackFromVideoId(videoId: string): RakuTrack {
+  return {
+    id: videoId,
+    name: `YouTube — ${videoId}`,
+    artists: [{ id: "", name: "YouTube" }],
+    album: {
+      id: "",
+      name: "",
+      images: [
+        {
+          url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+          width: 480,
+          height: 360,
+        },
+      ],
+    },
+    duration_ms: 0,
+    uri: videoId,
+    preview_url: null,
+    provider: "youtube",
+    itemType: "video",
+  };
+}
 
 // Report playback to YouTube (updates server-side history)
 export async function reportYouTubePlayback(videoId: string): Promise<boolean> {

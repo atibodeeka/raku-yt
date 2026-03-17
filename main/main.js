@@ -5,6 +5,9 @@ const { execFile } = require("child_process");
 const crypto = require("crypto");
 const YTMusic = require("ytmusic-api");
 
+// Raise default max listeners to prevent warnings from concurrent HTTPS requests
+require("events").EventEmitter.defaultMaxListeners = 20;
+
 let mainWindow;
 let loginWindow = null;
 let ytmusic = null;
@@ -512,6 +515,26 @@ ipcMain.handle("ytmusic:searchVideos", async (_event, query) => {
   return ytmusic.searchVideos(query);
 });
 
+ipcMain.handle("ytmusic:search", async (_event, query) => {
+  if (!ytmusic) return [];
+  return ytmusic.search(query);
+});
+
+ipcMain.handle("ytmusic:searchArtists", async (_event, query) => {
+  if (!ytmusic) return [];
+  return ytmusic.searchArtists(query);
+});
+
+ipcMain.handle("ytmusic:searchAlbums", async (_event, query) => {
+  if (!ytmusic) return [];
+  return ytmusic.searchAlbums(query);
+});
+
+ipcMain.handle("ytmusic:searchPlaylists", async (_event, query) => {
+  if (!ytmusic) return [];
+  return ytmusic.searchPlaylists(query);
+});
+
 ipcMain.handle("ytmusic:getHomeSections", async () => {
   if (!ytmusic) return [];
   const sections = await ytmusic.getHomeSections();
@@ -536,7 +559,46 @@ ipcMain.handle("ytmusic:getArtistSongs", async (_event, artistId) => {
 
 ipcMain.handle("ytmusic:getPlaylistVideos", async (_event, playlistId) => {
   if (!ytmusic) return [];
-  return ytmusic.getPlaylistVideos(playlistId);
+  // Normalize: strip VL prefix if present (browseEndpoint IDs use VLPLxxx format,
+  // but ytmusic-api adds VL itself when it sees PL prefix)
+  let id = playlistId;
+  if (id.startsWith("VL")) id = id.slice(2);
+  try {
+    return await ytmusic.getPlaylistVideos(id);
+  } catch (e) {
+    console.warn(
+      `getPlaylistVideos (ytmusic-api) failed for "${id}":`,
+      e.message,
+    );
+    // Fallback: use authenticated innertube browse API for private/personal playlists
+    try {
+      const browseId = id.startsWith("PL")
+        ? "VL" + id
+        : id.startsWith("VL")
+          ? id
+          : "VL" + id;
+      console.log(`Trying authenticated browse with browseId: ${browseId}`);
+      const data = await ytMusicBrowse(browseId);
+      const tracks = extractTracksFromBrowse(data, "Playlist");
+      // Convert innertube track format to ytmusic-api VideoDetailed shape
+      return tracks.map((t) => ({
+        type: "VIDEO",
+        videoId: t.videoId,
+        name: t.title,
+        artist: { artistId: t.artistId || null, name: t.artistName || "" },
+        duration: t.durationMs ? Math.round(t.durationMs / 1000) : null,
+        thumbnails: t.thumbnail
+          ? [{ url: t.thumbnail, width: 480, height: 480 }]
+          : [],
+      }));
+    } catch (e2) {
+      console.warn(
+        `getPlaylistVideos (innertube fallback) also failed:`,
+        e2.message,
+      );
+      return [];
+    }
+  }
 });
 
 ipcMain.handle("ytmusic:getSong", async (_event, videoId) => {
@@ -1517,6 +1579,7 @@ ipcMain.on("set-compact-mode", (_event, compact) => {
     });
     mainWindow.setResizable(false);
   } else {
+    mainWindow.setResizable(true);
     mainWindow.setMinimumSize(900, 600);
     mainWindow.setMaximumSize(0, 0);
     if (normalBounds) {
@@ -1524,6 +1587,5 @@ ipcMain.on("set-compact-mode", (_event, compact) => {
     } else {
       mainWindow.setBounds({ width: 1200, height: 800 });
     }
-    mainWindow.setResizable(true);
   }
 });

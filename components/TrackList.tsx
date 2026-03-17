@@ -3,7 +3,14 @@
 import { RakuTrack, useStore } from "@/lib/store";
 import { formatTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { FiPlay, FiMoreHorizontal, FiDisc, FiList } from "react-icons/fi";
+import {
+  FiPlay,
+  FiMoreHorizontal,
+  FiDisc,
+  FiList,
+  FiUser,
+  FiVideo,
+} from "react-icons/fi";
 
 interface TrackListProps {
   tracks: RakuTrack[];
@@ -27,6 +34,11 @@ export default function TrackList({
   const isPlaylistItem = (track: RakuTrack) =>
     track.itemType === "album" || track.itemType === "playlist";
 
+  const isNonPlayable = (track: RakuTrack) =>
+    track.itemType === "album" ||
+    track.itemType === "playlist" ||
+    track.itemType === "artist";
+
   const handlePlay = async (track: RakuTrack, index: number) => {
     if (!isLoggedIn) return;
     // If this is an album/playlist, navigate to its page instead
@@ -34,9 +46,13 @@ export default function TrackList({
       handlePlaylistClick(track);
       return;
     }
+    if (track.itemType === "artist") {
+      handleArtistClick({ id: track.id, name: track.name });
+      return;
+    }
     try {
       // Filter out non-playable items for the queue
-      const playableTracks = tracks.filter((t) => !isPlaylistItem(t));
+      const playableTracks = tracks.filter((t) => !isNonPlayable(t));
       const playableIndex = playableTracks.findIndex((t) => t.id === track.id);
       setQueue(playableTracks, playableIndex >= 0 ? playableIndex : 0);
       setCurrentTrack(track);
@@ -49,7 +65,8 @@ export default function TrackList({
 
   const handlePlaylistClick = (track: RakuTrack) => {
     const thumbnail = track.album?.images?.[0]?.url || "";
-    setPlaylistPage({ id: track.id, name: track.name, thumbnail });
+    const id = track.id.startsWith("VL") ? track.id.slice(2) : track.id;
+    setPlaylistPage({ id, name: track.name, thumbnail });
     setCurrentPage("playlist");
   };
 
@@ -87,13 +104,20 @@ export default function TrackList({
       {tracks.map((track, index) => {
         const isEven = index % 2 === 0;
         const isCollection = isPlaylistItem(track);
+        const isArtist = track.itemType === "artist";
+        const isVideo = track.itemType === "video";
+        const isClickable = isCollection || isArtist;
         return (
           <div
             key={`${track.id}-${index}`}
             className={`track-row flex items-center px-3 py-1.5 group cursor-pointer ${isEven ? "bg-white" : "bg-melon-tablealt"}`}
             onDoubleClick={() => handlePlay(track, index)}
             onClick={
-              isCollection ? () => handlePlaylistClick(track) : undefined
+              isCollection
+                ? () => handlePlaylistClick(track)
+                : isArtist
+                  ? () => handleArtistClick({ id: track.id, name: track.name })
+                  : undefined
             }>
             {showRank && (
               <div className="w-10 text-center">
@@ -120,12 +144,14 @@ export default function TrackList({
                     ) : (
                       <FiList size={12} className="text-gray-300" />
                     )
+                  ) : isArtist ? (
+                    <FiUser size={12} className="text-gray-300" />
                   ) : (
                     <FiPlay size={12} className="text-gray-300" />
                   )}
                 </div>
               )}
-              {!isCollection && (
+              {!isCollection && !isArtist && (
                 <button
                   onClick={() => handlePlay(track, index)}
                   className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -150,11 +176,22 @@ export default function TrackList({
                       : t("trackList.playlist", language)}
                   </span>
                 )}
+                {isArtist && (
+                  <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-100 text-green-600">
+                    {t("trackList.artist", language)}
+                  </span>
+                )}
+                {isVideo && (
+                  <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-red-100 text-red-600">
+                    <FiVideo size={10} className="inline mr-0.5" />
+                    Video
+                  </span>
+                )}
               </div>
             </div>
             <div className="w-16 text-center">
               <span className="text-xs text-gray-500">
-                {isCollection ? "—" : formatTime(track.duration_ms)}
+                {isCollection || isArtist ? "—" : formatTime(track.duration_ms)}
               </span>
             </div>
             <div className="w-36 hidden md:block">
@@ -180,9 +217,9 @@ export default function TrackList({
               </p>
             </div>
             <div className="w-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+              {/* <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
                 <FiMoreHorizontal size={13} />
-              </button>
+              </button> */}
             </div>
           </div>
         );

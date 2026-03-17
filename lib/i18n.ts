@@ -128,11 +128,11 @@ export const translations = {
   },
 
   // Search
-  "search.title": { ja: "楽曲検索", en: "Search", ko: "검색" },
+  "search.title": { ja: "検索", en: "Search", ko: "검색" },
   "search.placeholder": {
-    ja: "曲名、アーティスト名を入力...",
-    en: "Search songs, artists...",
-    ko: "곡명, 아티스트명 입력...",
+    ja: "曲、動画、ポッドキャスト、アーティストを検索...",
+    en: "Search songs, videos, podcasts, artists...",
+    ko: "곡, 동영상, 팟캐스트, 아티스트 검색...",
   },
   "search.button": { ja: "検索", en: "Search", ko: "검색" },
   "search.noResults": {
@@ -146,9 +146,34 @@ export const translations = {
     ko: "다른 키워드를 시도해 보세요",
   },
   "search.prompt": {
-    ja: "曲名やアーティスト名で検索",
-    en: "Search by song or artist name",
-    ko: "곡명이나 아티스트명으로 검색",
+    ja: "曲、動画、ポッドキャスト、アーティストを検索",
+    en: "Search songs, videos, podcasts, artists",
+    ko: "곡, 동영상, 팟캐스트, 아티스트 검색",
+  },
+  "search.playingUrl": {
+    ja: "YouTubeリンクから再生中...",
+    en: "Playing from YouTube link...",
+    ko: "YouTube 링크에서 재생 중...",
+  },
+  "search.urlFailed": {
+    ja: "このYouTubeリンクを再生できませんでした。URLを確認してください。",
+    en: "Could not play this YouTube link. Please check the URL.",
+    ko: "이 YouTube 링크를 재생할 수 없습니다. URL을 확인해 주세요.",
+  },
+  "search.urlHint": {
+    ja: "YouTubeのリンクを貼り付けて直接再生もできます",
+    en: "You can also paste a YouTube link to play directly",
+    ko: "YouTube 링크를 붙여넣어 바로 재생할 수도 있습니다",
+  },
+  "search.filterAll": { ja: "すべて", en: "All", ko: "전체" },
+  "search.filterSongs": { ja: "曲", en: "Songs", ko: "곡" },
+  "search.filterVideos": { ja: "動画", en: "Videos", ko: "동영상" },
+  "search.filterAlbums": { ja: "アルバム", en: "Albums", ko: "앨범" },
+  "search.filterArtists": { ja: "アーティスト", en: "Artists", ko: "아티스트" },
+  "search.filterPlaylists": {
+    ja: "プレイリスト",
+    en: "Playlists",
+    ko: "재생목록",
   },
 
   // Liked Songs

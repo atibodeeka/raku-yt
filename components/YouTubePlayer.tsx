@@ -110,7 +110,16 @@ export function useYouTubePlayer(onEnded?: () => void) {
 
   // Load track via yt-dlp when currentTrack changes
   useEffect(() => {
-    if (!isYouTube || !currentTrack) return;
+    if (!currentTrack) {
+      // Track was cleared (e.g. logout) — stop audio
+      const audio = getAudio();
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      currentVideoIdRef.current = null;
+      return;
+    }
+    if (!isYouTube) return;
 
     const videoId = currentTrack.uri;
     if (currentVideoIdRef.current === videoId) return;

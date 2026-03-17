@@ -38,34 +38,31 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-melon-header">
+    <div className="flex-1 flex items-center justify-center bg-melon-bg">
       <div className="text-center">
         {/* Logo */}
         <div className="mb-8">
           <h1
             className="text-6xl font-bold text-melon-green mb-2"
-            style={{ fontFamily: "var(--font-round)" }}>
+            style={{ fontFamily: "'Rampart One', cursive" }}>
             楽
           </h1>
-          <p className="text-melon-muted text-sm tracking-[0.3em]">
+          <p className="text-melon-muted text-sm tracking-[0.3em] mt-5">
             RAKU PLAYER
           </p>
         </div>
 
         {/* Retro decorative line */}
         <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="h-px w-16 bg-gray-600" />
-          <span className="text-gray-500 text-xs">♪</span>
-          <div className="h-px w-16 bg-gray-600" />
+          <div className="h-px w-16 bg-melon-border" />
+          <span className="text-melon-muted text-xs">♪</span>
+          <div className="h-px w-16 bg-melon-border" />
         </div>
 
         {/* Description */}
-        <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+        <p className="text-melon-muted text-sm mb-8 leading-relaxed">
           {descParts.map((line, i) => (
-            <span key={i}>
-              {line}
-              {i < descParts.length - 1 && <br />}
-            </span>
+            <span key={i}>{line}</span>
           ))}
         </p>
 
@@ -87,9 +84,6 @@ export default function LoginScreen() {
             </span>
           </button>
         </div>
-
-        {/* Footer */}
-        <p className="text-gray-600 text-xs mt-12">Powered by YouTube Music</p>
       </div>
     </div>
   );

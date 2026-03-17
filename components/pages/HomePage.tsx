@@ -192,25 +192,42 @@ export default function HomePage() {
     fetchData();
   }, [fetchData]);
 
-  // Separate playlists/albums from song-only sections, skip unreliable sections like Shorts
-  const skipPatterns = /shorts|มาแรงใน/i;
+  // Only show specific curated sections
+  const allowPatterns = /ฮิตตลอดกาล|today'?s hits/i;
   const songSections: { title: string; tracks: RakuTrack[] }[] = [];
 
   for (const section of homeSections) {
-    if (skipPatterns.test(section.title)) continue;
-    const songs = section.tracks.filter(
-      (t) => t.itemType !== "album" && t.itemType !== "playlist",
-    );
-    if (songs.length > 0) {
-      songSections.push({ title: section.title, tracks: songs });
+    if (!allowPatterns.test(section.title)) continue;
+    if (section.tracks.length > 0) {
+      songSections.push({ title: section.title, tracks: section.tracks });
     }
   }
 
   const remainingSections = songSections;
 
   const handlePlayTrack = (track: RakuTrack, allTracks: RakuTrack[]) => {
-    const idx = allTracks.findIndex((t) => t.id === track.id);
-    setQueue(allTracks, idx >= 0 ? idx : 0);
+    // Playlist/album items can't be played directly — navigate to playlist page instead
+    if (track.itemType === "playlist" || track.itemType === "album") {
+      const id = track.id.startsWith("VL") ? track.id.slice(2) : track.id;
+      const thumbnail = track.album?.images?.[0]?.url || "";
+      setPlaylistPage({ id, name: track.name, thumbnail });
+      setCurrentPage("playlist");
+      return;
+    }
+    // Artist items — navigate to artist page
+    if (track.itemType === "artist") {
+      setArtistPage({ id: track.id, name: track.name });
+      setCurrentPage("artist");
+      return;
+    }
+    const playableTracks = allTracks.filter(
+      (t) =>
+        t.itemType !== "playlist" &&
+        t.itemType !== "album" &&
+        t.itemType !== "artist",
+    );
+    const playIdx = playableTracks.findIndex((t) => t.id === track.id);
+    setQueue(playableTracks, playIdx >= 0 ? playIdx : 0);
     setCurrentTrack(track);
     setIsPlaying(true);
     addToYouTubeHistory(track);
@@ -320,6 +337,25 @@ export default function HomePage() {
           </div>
         </section>
       )}
+
+      {/* Song Suggestions from YouTube Music Home */}
+      {remainingSections.map((section, si) => (
+        <section key={`section-${si}`} className="mb-8">
+          <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <FiMusic size={14} className="text-melon-green" />
+            {section.title}
+          </h2>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+            {section.tracks.map((track, ti) => (
+              <TrackCard
+                key={`${track.id}-${ti}`}
+                track={track}
+                onPlay={() => handlePlayTrack(track, section.tracks)}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

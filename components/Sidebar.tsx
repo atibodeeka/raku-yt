@@ -2,7 +2,8 @@
 
 import { useStore } from "@/lib/store";
 import { t } from "@/lib/i18n";
-import { clearTokens } from "@/lib/auth-storage";
+import { clearLogin } from "@/lib/auth-storage";
+import { logoutYouTube } from "@/lib/youtube-auth";
 import {
   FiHome,
   FiSearch,
@@ -31,9 +32,10 @@ export default function Sidebar() {
   const clearAuth = useStore((s) => s.clearAuth);
   const language = useStore((s) => s.language);
 
-  const handleLogout = () => {
-    clearTokens();
+  const handleLogout = async () => {
+    clearLogin();
     clearAuth();
+    await logoutYouTube();
   };
 
   const providerLabel = "YouTube";
@@ -44,9 +46,9 @@ export default function Sidebar() {
       <div className="px-4 py-4 border-b border-melon-darkborder">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-full bg-gray-600 flex items-center justify-center overflow-hidden border border-gray-500">
-            {user?.images?.[0]?.url ? (
+            {user?.avatar ? (
               <img
-                src={user.images[0].url}
+                src={user.avatar}
                 alt=""
                 className="w-full h-full object-cover"
               />

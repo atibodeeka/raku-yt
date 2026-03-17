@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
+import { getYouTubeHistory } from "@/lib/youtube-api";
 import TrackList from "@/components/TrackList";
 import Spinner from "@/components/ui/Spinner";
 import PageHeader from "@/components/ui/PageHeader";
@@ -9,24 +10,23 @@ import { t } from "@/lib/i18n";
 import { FiClock } from "react-icons/fi";
 
 export default function HistoryPage() {
-  const accessToken = useStore((s) => s.accessToken);
+  const isLoggedIn = useStore((s) => s.isLoggedIn);
   const [tracks, setTracks] = useState<RakuTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const language = useStore((s) => s.language);
 
   const fetchHistory = useCallback(async () => {
-    if (!accessToken) return;
+    if (!isLoggedIn) return;
+    setLoading(true);
     try {
-      const stored = localStorage.getItem("raku_yt_history");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setTracks(parsed);
-        }
-      }
-    } catch {}
-    setLoading(false);
-  }, [accessToken]);
+      const ytTracks = await getYouTubeHistory();
+      setTracks(ytTracks);
+    } catch (err) {
+      console.error("履歴取得エラー:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [isLoggedIn]);
 
   useEffect(() => {
     fetchHistory();

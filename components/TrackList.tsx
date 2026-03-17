@@ -3,36 +3,42 @@
 import { RakuTrack, useStore } from "@/lib/store";
 import { formatTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { rateYouTubeVideo } from "@/lib/youtube-api";
-import { FiPlay, FiHeart, FiMoreHorizontal } from "react-icons/fi";
+import { FiPlay, FiMoreHorizontal, FiDisc, FiList } from "react-icons/fi";
 
 interface TrackListProps {
   tracks: RakuTrack[];
   showRank?: boolean;
-  likedIds?: Set<string>;
-  onToggleLike?: (trackId: string, isLiked: boolean) => void;
 }
 
 export default function TrackList({
   tracks,
   showRank = false,
-  likedIds,
-  onToggleLike,
 }: TrackListProps) {
-  const accessToken = useStore((s) => s.accessToken);
-  const provider = useStore((s) => s.provider);
+  const isLoggedIn = useStore((s) => s.isLoggedIn);
   const setCurrentTrack = useStore((s) => s.setCurrentTrack);
   const setIsPlaying = useStore((s) => s.setIsPlaying);
   const setQueue = useStore((s) => s.setQueue);
   const addToYouTubeHistory = useStore((s) => s.addToYouTubeHistory);
   const setArtistPage = useStore((s) => s.setArtistPage);
+  const setPlaylistPage = useStore((s) => s.setPlaylistPage);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
   const language = useStore((s) => s.language);
 
+  const isPlaylistItem = (track: RakuTrack) =>
+    track.itemType === "album" || track.itemType === "playlist";
+
   const handlePlay = async (track: RakuTrack, index: number) => {
-    if (!accessToken) return;
+    if (!isLoggedIn) return;
+    // If this is an album/playlist, navigate to its page instead
+    if (isPlaylistItem(track)) {
+      handlePlaylistClick(track);
+      return;
+    }
     try {
-      setQueue(tracks, index);
+      // Filter out non-playable items for the queue
+      const playableTracks = tracks.filter((t) => !isPlaylistItem(t));
+      const playableIndex = playableTracks.findIndex((t) => t.id === track.id);
+      setQueue(playableTracks, playableIndex >= 0 ? playableIndex : 0);
       setCurrentTrack(track);
       setIsPlaying(true);
       addToYouTubeHistory(track);
@@ -41,15 +47,10 @@ export default function TrackList({
     }
   };
 
-  const handleLike = async (track: RakuTrack) => {
-    if (!accessToken || !onToggleLike) return;
-    const isLiked = likedIds?.has(track.id) ?? false;
-    try {
-      await rateYouTubeVideo(accessToken, track.id, isLiked ? "none" : "like");
-      onToggleLike(track.id, !isLiked);
-    } catch {
-      // silently fail
-    }
+  const handlePlaylistClick = (track: RakuTrack) => {
+    const thumbnail = track.album?.images?.[0]?.url || "";
+    setPlaylistPage({ id: track.id, name: track.name, thumbnail });
+    setCurrentPage("playlist");
   };
 
   const handleArtistClick = (artist: { id: string; name: string }) => {
@@ -80,19 +81,20 @@ export default function TrackList({
         <div className="w-36 hidden lg:block text-[11px] text-gray-500">
           {t("trackList.album", language)}
         </div>
-        <div className="w-20 text-center text-[11px] text-gray-500">
-          {t("trackList.actions", language)}
-        </div>
+        <div className="w-10" />
       </div>
 
       {tracks.map((track, index) => {
-        const isLiked = likedIds?.has(track.id) ?? false;
         const isEven = index % 2 === 0;
+        const isCollection = isPlaylistItem(track);
         return (
           <div
             key={`${track.id}-${index}`}
             className={`track-row flex items-center px-3 py-1.5 group cursor-pointer ${isEven ? "bg-white" : "bg-melon-tablealt"}`}
-            onDoubleClick={() => handlePlay(track, index)}>
+            onDoubleClick={() => handlePlay(track, index)}
+            onClick={
+              isCollection ? () => handlePlaylistClick(track) : undefined
+            }>
             {showRank && (
               <div className="w-10 text-center">
                 <span
@@ -112,23 +114,47 @@ export default function TrackList({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <FiPlay size={12} className="text-gray-300" />
+                  {isCollection ? (
+                    track.itemType === "album" ? (
+                      <FiDisc size={12} className="text-gray-300" />
+                    ) : (
+                      <FiList size={12} className="text-gray-300" />
+                    )
+                  ) : (
+                    <FiPlay size={12} className="text-gray-300" />
+                  )}
                 </div>
               )}
-              <button
-                onClick={() => handlePlay(track, index)}
-                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <FiPlay size={12} className="text-white ml-0.5" />
-              </button>
+              {!isCollection && (
+                <button
+                  onClick={() => handlePlay(track, index)}
+                  className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <FiPlay size={12} className="text-white ml-0.5" />
+                </button>
+              )}
             </div>
             <div className="flex-1 min-w-0 pl-3">
-              <p className="text-[13px] text-gray-800 truncate font-medium">
-                {track.name || t("trackList.unknown", language)}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[13px] text-gray-800 truncate font-medium">
+                  {track.name || t("trackList.unknown", language)}
+                </p>
+                {isCollection && (
+                  <span
+                    className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      track.itemType === "album"
+                        ? "bg-purple-100 text-purple-600"
+                        : "bg-blue-100 text-blue-600"
+                    }`}>
+                    {track.itemType === "album"
+                      ? t("trackList.album", language)
+                      : t("trackList.playlist", language)}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="w-16 text-center">
               <span className="text-xs text-gray-500">
-                {formatTime(track.duration_ms)}
+                {isCollection ? "—" : formatTime(track.duration_ms)}
               </span>
             </div>
             <div className="w-36 hidden md:block">
@@ -137,7 +163,10 @@ export default function TrackList({
                   <span key={a.id || i}>
                     {i > 0 && ", "}
                     <button
-                      onClick={() => handleArtistClick(a)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleArtistClick(a);
+                      }}
                       className="hover:text-melon-green hover:underline transition-colors">
                       {a.name}
                     </button>
@@ -150,12 +179,7 @@ export default function TrackList({
                 {track.album?.name}
               </p>
             </div>
-            <div className="w-20 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={() => handleLike(track)}
-                className={`p-1 transition-colors ${isLiked ? "text-melon-accent" : "text-gray-400 hover:text-melon-accent"}`}>
-                <FiHeart size={13} fill={isLiked ? "currentColor" : "none"} />
-              </button>
+            <div className="w-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
                 <FiMoreHorizontal size={13} />
               </button>

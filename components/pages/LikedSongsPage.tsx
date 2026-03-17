@@ -2,51 +2,36 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
-import { getYouTubeLikedVideos } from "@/lib/youtube-api";
+import { getYouTubeLikedSongs } from "@/lib/youtube-api";
 import TrackList from "@/components/TrackList";
 import Spinner from "@/components/ui/Spinner";
 import { t } from "@/lib/i18n";
 import { FiHeart } from "react-icons/fi";
 
 export default function LikedSongsPage() {
-  const accessToken = useStore((s) => s.accessToken);
+  const isLoggedIn = useStore((s) => s.isLoggedIn);
   const [tracks, setTracks] = useState<RakuTrack[]>([]);
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const language = useStore((s) => s.language);
 
   const fetchLiked = useCallback(async () => {
-    if (!accessToken) return;
+    if (!isLoggedIn) return;
     setLoading(true);
     try {
-      const ytTracks = await getYouTubeLikedVideos(accessToken, 50);
+      const ytTracks = await getYouTubeLikedSongs();
       setTracks(ytTracks);
-      setLikedIds(new Set(ytTracks.map((t) => t.id)));
       setTotal(ytTracks.length);
     } catch (err) {
       console.error("お気に入り取得エラー:", err);
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     fetchLiked();
   }, [fetchLiked]);
-
-  const handleToggleLike = (trackId: string, isLiked: boolean) => {
-    setLikedIds((prev) => {
-      const next = new Set(prev);
-      if (isLiked) {
-        next.add(trackId);
-      } else {
-        next.delete(trackId);
-        setTracks((prev) => prev.filter((t) => t.id !== trackId));
-      }
-      return next;
-    });
-  };
 
   return (
     <div className="p-6">
@@ -71,16 +56,9 @@ export default function LikedSongsPage() {
           <Spinner />
         </div>
       ) : tracks.length > 0 ? (
-        <>
-          <div className="border border-gray-200 rounded overflow-hidden">
-            <TrackList
-              tracks={tracks}
-              showRank
-              likedIds={likedIds}
-              onToggleLike={handleToggleLike}
-            />
-          </div>
-        </>
+        <div className="border border-gray-200 rounded overflow-hidden">
+          <TrackList tracks={tracks} showRank />
+        </div>
       ) : (
         <div className="text-center py-20">
           <FiHeart size={40} className="mx-auto text-gray-300 mb-4" />

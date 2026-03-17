@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { t, Language } from "@/lib/i18n";
 import PageHeader from "@/components/ui/PageHeader";
@@ -14,6 +15,7 @@ const languages: { code: Language; label: string; flag: string }[] = [
 export default function SettingsPage() {
   const language = useStore((s) => s.language);
   const compactMode = useStore((s) => s.compactMode);
+  const ytPremium = useStore((s) => s.ytPremium);
   const setLanguage = useStore((s) => s.setLanguage);
   const setCompactMode = useStore((s) => s.setCompactMode);
 

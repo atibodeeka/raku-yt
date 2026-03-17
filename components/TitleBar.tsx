@@ -1,6 +1,8 @@
 "use client";
 
 import { FiMinus, FiSquare, FiX } from "react-icons/fi";
+import { useStore } from "@/lib/store";
+import { t } from "@/lib/i18n";
 
 declare global {
   interface Window {
@@ -15,6 +17,9 @@ declare global {
 
 export default function TitleBar() {
   const isElectron = typeof window !== "undefined" && window.electronAPI;
+  const ytPremium = useStore((s) => s.ytPremium);
+  const isLoggedIn = useStore((s) => s.isLoggedIn);
+  const language = useStore((s) => s.language);
 
   return (
     <div className="titlebar-drag h-10 bg-melon-header flex items-center justify-between px-4 select-none shrink-0">
@@ -32,6 +37,21 @@ export default function TitleBar() {
         </div>
         <div className="h-4 w-px bg-gray-600" />
         <span className="text-gray-400 text-xs">PLAYER</span>
+        {isLoggedIn && (
+          <>
+            <div className="h-4 w-px bg-gray-600" />
+            <span
+              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm leading-none ${
+                ytPremium
+                  ? "bg-amber-500/20 text-amber-400"
+                  : "bg-white/10 text-gray-400"
+              }`}>
+              {ytPremium
+                ? t("player.premium", language)
+                : t("player.free", language)}
+            </span>
+          </>
+        )}
       </div>
 
       {/* Center: Brand */}

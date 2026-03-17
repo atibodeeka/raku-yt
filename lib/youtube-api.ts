@@ -11,8 +11,22 @@ declare global {
       getArtist: (artistId: string) => Promise<YTMusicArtist | null>;
       getArtistSongs: (artistId: string) => Promise<YTMusicSong[]>;
       getPlaylistVideos: (playlistId: string) => Promise<YTMusicVideo[]>;
+      getLikedSongs: () => Promise<InnertubeTrack[]>;
+      getHistory: () => Promise<InnertubeTrack[]>;
     };
   }
+}
+
+// Track object returned by our innertube browse handlers
+interface InnertubeTrack {
+  videoId: string;
+  title: string;
+  artistName: string;
+  artistId: string;
+  albumName: string;
+  albumId: string;
+  thumbnail: string;
+  durationMs: number;
 }
 
 // ytmusic-api types (simplified for our needs)
@@ -125,6 +139,73 @@ function videoToTrack(video: YTMusicVideo): RakuTrack {
   };
 }
 
+// Convert home section content item to RakuTrack (songs, albums, playlists)
+function homeItemToTrack(
+  item: YTMusicSong | YTMusicHomeAlbum | YTMusicHomePlaylist,
+): RakuTrack | null {
+  if (item.type === "SONG") {
+    const track = songToTrack(item as YTMusicSong);
+    track.itemType = "song";
+    return track;
+  }
+  // For albums and playlists, create a navigable entry
+  if (item.type === "ALBUM") {
+    const album = item as YTMusicHomeAlbum;
+    return {
+      id: album.playlistId || album.albumId,
+      name: album.name,
+      artists: [{ id: album.artist.artistId || "", name: album.artist.name }],
+      album: {
+        id: album.albumId,
+        name: album.name,
+        images:
+          album.thumbnails.length > 0
+            ? [
+                {
+                  url: album.thumbnails[album.thumbnails.length - 1].url,
+                  width: 480,
+                  height: 480,
+                },
+              ]
+            : [],
+      },
+      duration_ms: 0,
+      uri: album.playlistId || album.albumId,
+      preview_url: null,
+      provider: "youtube",
+      itemType: "album",
+    };
+  }
+  if (item.type === "PLAYLIST") {
+    const pl = item as YTMusicHomePlaylist;
+    return {
+      id: pl.playlistId,
+      name: pl.name,
+      artists: [{ id: pl.artist.artistId || "", name: pl.artist.name }],
+      album: {
+        id: "",
+        name: pl.name,
+        images:
+          pl.thumbnails.length > 0
+            ? [
+                {
+                  url: pl.thumbnails[pl.thumbnails.length - 1].url,
+                  width: 480,
+                  height: 480,
+                },
+              ]
+            : [],
+      },
+      duration_ms: 0,
+      uri: pl.playlistId,
+      preview_url: null,
+      provider: "youtube",
+      itemType: "playlist",
+    };
+  }
+  return null;
+}
+
 // 楽曲検索
 export async function searchYouTubeTracks(
   query: string,
@@ -135,183 +216,62 @@ export async function searchYouTubeTracks(
   return songs.map(songToTrack);
 }
 
-// 人気の音楽 (YouTube Data API v3 — Top 50 Music in Japan)
-export async function getYouTubeTrendingMusic(
-  maxResults = 50,
-): Promise<RakuTrack[]> {
-  const data = await fetchYouTube("/videos", {
-    part: "snippet,contentDetails",
-    chart: "mostPopular",
-    regionCode: "JP",
-    videoCategoryId: "10", // Music category
-    maxResults: maxResults.toString(),
-  });
-
-  if (!data?.items) return [];
-  return data.items.map(
-    (item: {
-      id: string;
-      snippet: {
-        title: string;
-        channelId: string;
-        channelTitle: string;
-        thumbnails: { high?: { url: string }; default?: { url: string } };
-      };
-      contentDetails?: { duration: string };
-    }) => ({
-      id: item.id,
-      name: item.snippet.title,
-      artists: [
-        { id: item.snippet.channelId, name: item.snippet.channelTitle },
-      ],
-      album: {
-        id: "",
-        name: "",
-        images: [
-          {
-            url:
-              item.snippet.thumbnails?.high?.url ||
-              item.snippet.thumbnails?.default?.url ||
-              "",
-            width: 480,
-            height: 360,
-          },
-        ],
-      },
-      duration_ms: item.contentDetails?.duration
-        ? parseDuration(item.contentDetails.duration)
-        : 0,
-      uri: item.id,
-      preview_url: null,
-      provider: "youtube" as const,
-    }),
-  );
+// ホームセクション取得 (via ytmusic-api)
+export async function getYouTubeHomeSections(): Promise<
+  { title: string; tracks: RakuTrack[] }[]
+> {
+  if (!window.ytmusicAPI) return [];
+  const sections = await window.ytmusicAPI.getHomeSections();
+  return sections
+    .map((section) => ({
+      title: section.title,
+      tracks: section.contents
+        .map(homeItemToTrack)
+        .filter((t): t is RakuTrack => t !== null),
+    }))
+    .filter((s) => s.tracks.length > 0);
 }
 
-// YouTube Data API v3 — used for authenticated operations only
-const YT_API_BASE = "https://www.googleapis.com/youtube/v3";
-const YT_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || "";
-
-async function fetchYouTube(
-  endpoint: string,
-  params: Record<string, string>,
-  accessToken?: string,
-  options?: { method?: string },
-) {
-  const searchParams = new URLSearchParams({
-    ...params,
-    key: YT_API_KEY,
-  });
-
-  const headers: Record<string, string> = {};
-  if (accessToken) {
-    headers["Authorization"] = `Bearer ${accessToken}`;
+// お気に入り（いいねした曲） — via innertube browse API with session cookies
+export async function getYouTubeLikedSongs(): Promise<RakuTrack[]> {
+  if (!window.ytmusicAPI) return [];
+  try {
+    const tracks = await window.ytmusicAPI.getLikedSongs();
+    return tracks.map(innertubeTrackToRaku);
+  } catch {
+    return [];
   }
+}
 
-  const response = await fetch(`${YT_API_BASE}${endpoint}?${searchParams}`, {
-    method: options?.method || "GET",
-    headers,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) throw new Error("UNAUTHORIZED");
-    throw new Error(`YouTube API Error: ${response.status}`);
+// 再生履歴 — via innertube browse API with session cookies
+export async function getYouTubeHistory(): Promise<RakuTrack[]> {
+  if (!window.ytmusicAPI) return [];
+  try {
+    const tracks = await window.ytmusicAPI.getHistory();
+    return tracks.map(innertubeTrackToRaku);
+  } catch {
+    return [];
   }
-
-  if (response.status === 204) return null;
-  return response.json();
 }
 
-// ユーザーのお気に入り（高評価動画） — requires OAuth
-export async function getYouTubeLikedVideos(
-  accessToken: string,
-  maxResults = 50,
-): Promise<RakuTrack[]> {
-  const data = await fetchYouTube(
-    "/videos",
-    {
-      part: "snippet,contentDetails,status",
-      myRating: "like",
-      maxResults: maxResults.toString(),
-    },
-    accessToken,
-  );
-
-  if (!data?.items) return [];
-  return data.items
-    .filter(
-      (item: { status?: { embeddable?: boolean } }) =>
-        item.status?.embeddable !== false,
-    )
-    .map(
-      (item: {
-        id: string;
-        snippet: {
-          title: string;
-          channelId: string;
-          channelTitle: string;
-          thumbnails: { high?: { url: string }; default?: { url: string } };
-        };
-        contentDetails?: { duration: string };
-      }) => ({
-        id: item.id,
-        name: item.snippet.title,
-        artists: [
-          { id: item.snippet.channelId, name: item.snippet.channelTitle },
-        ],
-        album: {
-          id: "",
-          name: "",
-          images: [
-            {
-              url:
-                item.snippet.thumbnails?.high?.url ||
-                item.snippet.thumbnails?.default?.url ||
-                "",
-              width: 480,
-              height: 360,
-            },
-          ],
-        },
-        duration_ms: item.contentDetails?.duration
-          ? parseDuration(item.contentDetails.duration)
-          : 0,
-        uri: item.id,
-        preview_url: null,
-        provider: "youtube" as const,
-      }),
-    );
-}
-
-// ユーザー情報取得 (Google OAuth)
-export async function getYouTubeUserInfo(accessToken: string) {
-  const response = await fetch(
-    "https://www.googleapis.com/oauth2/v2/userinfo",
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    },
-  );
-
-  if (!response.ok) throw new Error("ユーザー情報の取得に失敗しました");
-
-  const data = await response.json();
+// Convert innertube track to RakuTrack
+function innertubeTrackToRaku(t: InnertubeTrack): RakuTrack {
   return {
-    id: data.id,
-    display_name: data.name || "YouTubeユーザー",
-    email: data.email || "",
-    images: data.picture ? [{ url: data.picture }] : [],
-    product: "youtube",
+    id: t.videoId,
+    name: t.title || "不明な曲",
+    artists: [{ id: t.artistId || "", name: t.artistName || "" }],
+    album: {
+      id: t.albumId || "",
+      name: t.albumName || "",
+      images: t.thumbnail
+        ? [{ url: t.thumbnail, width: 480, height: 480 }]
+        : [],
+    },
+    duration_ms: t.durationMs || 0,
+    uri: t.videoId,
+    preview_url: null,
+    provider: "youtube",
   };
-}
-
-// Parse ISO 8601 duration (PT4M13S) to milliseconds
-function parseDuration(iso: string): number {
-  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return 0;
-  const hours = parseInt(match[1] || "0", 10);
-  const minutes = parseInt(match[2] || "0", 10);
-  const seconds = parseInt(match[3] || "0", 10);
-  return (hours * 3600 + minutes * 60 + seconds) * 1000;
 }
 
 // アーティスト情報取得 (via ytmusic-api)
@@ -327,7 +287,7 @@ export async function getYouTubeChannelInfo(channelId: string) {
       thumbnail: artist.thumbnails?.[artist.thumbnails.length - 1]?.url || "",
       subscriberCount: "0",
       videoCount: "0",
-      uploadsPlaylistId: "", // not used with ytmusic-api
+      uploadsPlaylistId: "",
     };
   } catch {
     return null;
@@ -338,74 +298,16 @@ export async function getYouTubeChannelInfo(channelId: string) {
 export async function getYouTubePlaylistItems(
   playlistId: string,
   _maxResults = 20,
-  _accessToken?: string,
 ): Promise<RakuTrack[]> {
   if (!window.ytmusicAPI) return [];
   try {
-    // If it's an artist ID (starts with UC), get artist songs
     if (playlistId.startsWith("UC")) {
       const songs = await window.ytmusicAPI.getArtistSongs(playlistId);
       return songs.map(songToTrack);
     }
-    // Otherwise treat as playlist
     const videos = await window.ytmusicAPI.getPlaylistVideos(playlistId);
     return videos.map(videoToTrack);
   } catch {
     return [];
   }
-}
-
-// ユーザーのプレイリスト一覧 — requires OAuth
-export async function getYouTubeUserPlaylists(
-  accessToken: string,
-  maxResults = 10,
-) {
-  const data = await fetchYouTube(
-    "/playlists",
-    {
-      part: "snippet,contentDetails",
-      mine: "true",
-      maxResults: maxResults.toString(),
-    },
-    accessToken,
-  );
-
-  if (!data?.items) return [];
-  return data.items.map(
-    (item: {
-      id: string;
-      snippet: {
-        title: string;
-        description: string;
-        thumbnails: { high?: { url: string }; default?: { url: string } };
-      };
-      contentDetails?: { itemCount: number };
-    }) => ({
-      id: item.id,
-      name: item.snippet.title,
-      description: item.snippet.description || "",
-      thumbnail:
-        item.snippet.thumbnails?.high?.url ||
-        item.snippet.thumbnails?.default?.url ||
-        "",
-      itemCount: item.contentDetails?.itemCount || 0,
-    }),
-  );
-}
-
-// 動画の評価（いいね / いいね解除）— requires OAuth
-export async function rateYouTubeVideo(
-  accessToken: string,
-  videoId: string,
-  rating: "like" | "none",
-): Promise<void> {
-  await fetchYouTube(
-    "/videos/rate",
-    {
-      id: videoId,
-      rating,
-    },
-    accessToken,
-    { method: "POST" },
-  );
 }

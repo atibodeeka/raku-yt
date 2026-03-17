@@ -2,61 +2,41 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useStore, RakuTrack } from "@/lib/store";
-import {
-  getYouTubeChannelInfo,
-  getYouTubePlaylistItems,
-} from "@/lib/youtube-api";
+import { getYouTubePlaylistItems } from "@/lib/youtube-api";
 import TrackList from "@/components/TrackList";
 import Spinner from "@/components/ui/Spinner";
 import { t } from "@/lib/i18n";
-import { FiArrowLeft, FiUser, FiVideo } from "react-icons/fi";
+import { FiArrowLeft, FiDisc, FiList } from "react-icons/fi";
 
-interface ChannelInfo {
-  id: string;
-  name: string;
-  description: string;
-  thumbnail: string;
-  subscriberCount: string;
-  videoCount: string;
-  uploadsPlaylistId: string;
-}
-
-export default function ArtistPage() {
-  const artistPageData = useStore((s) => s.artistPageData);
+export default function PlaylistPage() {
+  const playlistPageData = useStore((s) => s.playlistPageData);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
-  const isLoggedIn = useStore((s) => s.isLoggedIn);
   const language = useStore((s) => s.language);
-  const [channelInfo, setChannelInfo] = useState<ChannelInfo | null>(null);
   const [tracks, setTracks] = useState<RakuTrack[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchArtist = useCallback(async () => {
-    if (!artistPageData?.id) return;
+  const fetchPlaylist = useCallback(async () => {
+    if (!playlistPageData?.id) return;
     setLoading(true);
     try {
-      const info = await getYouTubeChannelInfo(artistPageData.id);
-      if (info) {
-        setChannelInfo(info);
-        // Fetch artist songs using the artist ID directly
-        const songs = await getYouTubePlaylistItems(artistPageData.id, 30);
-        setTracks(songs);
-      }
+      const items = await getYouTubePlaylistItems(playlistPageData.id, 50);
+      setTracks(items);
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, [artistPageData]);
+  }, [playlistPageData]);
 
   useEffect(() => {
-    fetchArtist();
-  }, [fetchArtist]);
+    fetchPlaylist();
+  }, [fetchPlaylist]);
 
-  if (!artistPageData) {
+  if (!playlistPageData) {
     return (
       <div className="p-6 text-center py-20">
         <p className="text-gray-500 text-sm">
-          {t("artist.noArtist", language)}
+          {t("playlist.noPlaylist", language)}
         </p>
       </div>
     );
@@ -69,7 +49,7 @@ export default function ArtistPage() {
         onClick={() => setCurrentPage("home")}
         className="flex items-center gap-2 text-gray-500 hover:text-melon-green transition-colors mb-4 text-sm">
         <FiArrowLeft size={14} />
-        {t("artist.back", language)}
+        {t("playlist.back", language)}
       </button>
 
       {loading ? (
@@ -78,18 +58,18 @@ export default function ArtistPage() {
         </div>
       ) : (
         <>
-          {/* Artist header */}
+          {/* Playlist header */}
           <div className="flex items-center gap-5 mb-8">
-            <div className="w-24 h-24 rounded-full bg-gray-100 overflow-hidden shrink-0 border-2 border-melon-green shadow-lg">
-              {channelInfo?.thumbnail ? (
+            <div className="w-24 h-24 rounded-lg bg-gray-100 overflow-hidden shrink-0 border-2 border-melon-green shadow-lg">
+              {playlistPageData.thumbnail ? (
                 <img
-                  src={channelInfo.thumbnail}
+                  src={playlistPageData.thumbnail}
                   alt=""
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <FiUser size={32} className="text-gray-300" />
+                  <FiDisc size={32} className="text-gray-300" />
                 </div>
               )}
             </div>
@@ -97,21 +77,19 @@ export default function ArtistPage() {
               <h1
                 className="text-xl font-bold text-gray-800 mb-1"
                 style={{ fontFamily: "var(--font-round)" }}>
-                {channelInfo?.name || artistPageData.name}
+                {playlistPageData.name}
               </h1>
-              {channelInfo?.description && (
-                <p className="text-xs text-gray-400 mt-2 line-clamp-2 max-w-lg">
-                  {channelInfo.description}
-                </p>
-              )}
+              <p className="text-xs text-gray-400">
+                {tracks.length} {t("playlist.trackCount", language)}
+              </p>
             </div>
           </div>
 
-          {/* Videos */}
+          {/* Tracks */}
           <section>
             <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-              <FiVideo size={14} className="text-melon-green" />
-              {t("artist.popularSongs", language)}
+              <FiList size={14} className="text-melon-green" />
+              {t("playlist.songs", language)}
             </h2>
             {tracks.length > 0 ? (
               <div className="border border-gray-200 rounded overflow-hidden">
@@ -119,7 +97,7 @@ export default function ArtistPage() {
               </div>
             ) : (
               <p className="text-gray-500 text-sm text-center py-10">
-                {t("artist.noVideos", language)}
+                {t("playlist.empty", language)}
               </p>
             )}
           </section>

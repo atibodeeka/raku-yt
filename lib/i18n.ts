@@ -35,6 +35,26 @@ export const translations = {
     en: "yt-dlp is not available. Please install it.",
     ko: "yt-dlp를 사용할 수 없습니다. 설치해 주세요.",
   },
+  "player.premiumOnly": {
+    ja: "Music Premium 限定の曲です",
+    en: "Music Premium members only",
+    ko: "Music Premium 전용 곡입니다",
+  },
+  "player.cookieLock": {
+    ja: "ブラウザを閉じてから再試行するか、Settings で cookies.txt を使ってください",
+    en: "Close your browser and retry, or use cookies.txt (see Settings)",
+    ko: "브라우저를 닫고 다시 시도하거나 cookies.txt를 사용하세요 (설정 참조)",
+  },
+  "player.free": {
+    ja: "Free",
+    en: "Free",
+    ko: "Free",
+  },
+  "player.premium": {
+    ja: "Premium",
+    en: "Premium",
+    ko: "Premium",
+  },
 
   // Home
   "home.title": { ja: "ホーム", en: "Home", ko: "홈" },
@@ -74,9 +94,9 @@ export const translations = {
     ko: "플레이리스트에 트랙이 없습니다",
   },
   "home.fetchError": {
-    ja: "データの取得に失敗しました。YouTube APIキーやネットワークを確認してください。",
-    en: "Failed to fetch data. Check YouTube API key or network.",
-    ko: "데이터를 가져오지 못했습니다. YouTube API 키 또는 네트워크를 확인하세요.",
+    ja: "データの取得に失敗しました。ネットワーク接続を確認してください。",
+    en: "Failed to fetch data. Check your network connection.",
+    ko: "데이터를 가져오지 못했습니다. 네트워크 연결을 확인하세요.",
   },
 
   "home.unexpectedError": {
@@ -86,6 +106,21 @@ export const translations = {
   },
   "home.retry": { ja: "再試行", en: "Retry", ko: "재시도" },
   "home.songs": { ja: "曲", en: "songs", ko: "곡" },
+  "home.quickPicks": {
+    ja: "クイックピック",
+    en: "Quick Picks",
+    ko: "빠른 선곡",
+  },
+  "home.listenAgain": {
+    ja: "もう一度聴く",
+    en: "Listen Again",
+    ko: "다시 듣기",
+  },
+  "home.viewAll": {
+    ja: "すべて表示",
+    en: "View all",
+    ko: "모두 보기",
+  },
 
   // Search
   "search.title": { ja: "楽曲検索", en: "Search", ko: "검색" },
@@ -193,12 +228,32 @@ export const translations = {
     ko: "동영상을 찾을 수 없습니다",
   },
 
+  // Playlist
+  "playlist.back": { ja: "戻る", en: "Back", ko: "뒤로" },
+  "playlist.noPlaylist": {
+    ja: "プレイリストが選択されていません",
+    en: "No playlist selected",
+    ko: "플레이리스트가 선택되지 않았습니다",
+  },
+  "playlist.songs": { ja: "曲一覧", en: "Songs", ko: "곡 목록" },
+  "playlist.trackCount": { ja: "曲", en: "tracks", ko: "곡" },
+  "playlist.empty": {
+    ja: "プレイリストにトラックがありません",
+    en: "No tracks in this playlist",
+    ko: "플레이리스트에 트랙이 없습니다",
+  },
+
   // Track list
   "trackList.no": { ja: "No", en: "No", ko: "No" },
   "trackList.title": { ja: "曲名", en: "Title", ko: "곡명" },
   "trackList.time": { ja: "時間", en: "Time", ko: "시간" },
   "trackList.artist": { ja: "アーティスト", en: "Artist", ko: "아티스트" },
   "trackList.album": { ja: "アルバム", en: "Album", ko: "앨범" },
+  "trackList.playlist": {
+    ja: "プレイリスト",
+    en: "Playlist",
+    ko: "플레이리스트",
+  },
   "trackList.actions": { ja: "操作", en: "Actions", ko: "관리" },
   "trackList.unknown": { ja: "不明な曲", en: "Unknown", ko: "알 수 없는 곡" },
 
@@ -212,6 +267,11 @@ export const translations = {
     ja: "YouTubeでログイン",
     en: "Login with YouTube",
     ko: "YouTube로 로그인",
+  },
+  "login.loggingIn": {
+    ja: "ログイン中...",
+    en: "Logging in...",
+    ko: "로그인 중...",
   },
 
   // Settings
@@ -232,6 +292,56 @@ export const translations = {
     ko: "플레이어와 재생목록만 표시",
   },
   "settings.appearance": { ja: "外観", en: "Appearance", ko: "외관" },
+  "settings.cookieBrowser": {
+    ja: "YouTube Premium 連携",
+    en: "YouTube Premium",
+    ko: "YouTube Premium 연동",
+  },
+  "settings.cookieBrowserDesc": {
+    ja: "Music Premium アカウントでログイン中のブラウザを選択すると、Premium限定曲を再生できます。ブラウザを閉じた状態で使用してください。",
+    en: "Select the browser where you're logged into Music Premium. The browser must be closed for this to work on Windows.",
+    ko: "Music Premium에 로그인된 브라우저를 선택하세요. Windows에서는 브라우저를 닫은 상태에서 사용해야 합니다.",
+  },
+  "settings.browserNone": {
+    ja: "なし（Free）",
+    en: "None (Free)",
+    ko: "없음 (Free)",
+  },
+  "settings.cookiesFileRecommended": {
+    ja: "方法1: cookies.txt を使う（推奨）",
+    en: "Method 1: Use cookies.txt (Recommended)",
+    ko: "방법 1: cookies.txt 사용 (권장)",
+  },
+  "settings.cookiesFileHowTo": {
+    ja: "① Chromeで music.youtube.com にログイン → ② 拡張機能「Get cookies.txt LOCALLY」でcookiesをエクスポート → ③ 下記フォルダに cookies.txt を配置 → ④ アプリを再起動",
+    en: '① Log in to music.youtube.com in Chrome → ② Export cookies with "Get cookies.txt LOCALLY" extension → ③ Place cookies.txt in the folder below → ④ Restart app',
+    ko: '① Chrome에서 music.youtube.com 로그인 → ② "Get cookies.txt LOCALLY" 확장으로 쿠키 내보내기 → ③ 아래 폴더에 cookies.txt 배치 → ④ 앱 재시작',
+  },
+  "settings.cookiesFileLabel": {
+    ja: "または cookies.txt を使う（ブラウザを開いたままでもOK）",
+    en: "Or use cookies.txt (works with browser open)",
+    ko: "또는 cookies.txt 사용 (브라우저가 열려 있어도 가능)",
+  },
+  "settings.cookiesFileFound": {
+    ja: "✓ cookies.txt 検出済み — Premium モードで使用中",
+    en: "✓ cookies.txt found — using Premium mode",
+    ko: "✓ cookies.txt 감지됨 — Premium 모드 사용 중",
+  },
+  "settings.cookiesFileNotFound": {
+    ja: "cookies.txt が見つかりません。以下のフォルダに配置してください：",
+    en: "cookies.txt not found. Place it in:",
+    ko: "cookies.txt를 찾을 수 없습니다. 다음 폴더에 배치하세요:",
+  },
+  "settings.browserMethod": {
+    ja: "方法2: ブラウザから直接読み取る",
+    en: "Method 2: Read from browser directly",
+    ko: "방법 2: 브라우저에서 직접 읽기",
+  },
+  "settings.browserMethodDesc": {
+    ja: "Windowsでは Chrome/Edge を完全に閉じてから使用してください。Firefox は閉じなくてもOKです。",
+    en: "On Windows, fully close Chrome/Edge before use. Firefox works without closing.",
+    ko: "Windows에서는 Chrome/Edge를 완전히 닫은 후 사용하세요. Firefox는 닫지 않아도 됩니다.",
+  },
 
   // Compact mode
   "compact.currentPlaylist": {

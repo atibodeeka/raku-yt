@@ -36,7 +36,7 @@
     "productName": "楽 Raku Player",
     "files": [
       "main/**/*",
-      ".next/**/*",
+      "out/**/*",
       "public/**/*",
       "node_modules/**/*",
       "package.json"

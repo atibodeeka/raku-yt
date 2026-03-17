@@ -51,7 +51,7 @@ export default function CompactPlayer({
   const setVolume = useStore((s) => s.setVolume);
   const queue = useStore((s) => s.queue);
   const queueIndex = useStore((s) => s.queueIndex);
-  const accessToken = useStore((s) => s.accessToken);
+  const isLoggedIn = useStore((s) => s.isLoggedIn);
   const setCompactMode = useStore((s) => s.setCompactMode);
   const setCurrentTrack = useStore((s) => s.setCurrentTrack);
   const setIsPlaying = useStore((s) => s.setIsPlaying);
@@ -61,6 +61,8 @@ export default function CompactPlayer({
   const addToYouTubeHistory = useStore((s) => s.addToYouTubeHistory);
   const showToast = useStore((s) => s.showToast);
   const provider = useStore((s) => s.provider);
+
+  const ytPremium = useStore((s) => s.ytPremium);
 
   const [activeTab, setActiveTab] = useState<CompactTab>("playlist");
   const [searchQuery, setSearchQuery] = useState("");
@@ -124,6 +126,16 @@ export default function CompactPlayer({
             ♪
           </span>
           <span className="text-white font-bold text-xs">楽</span>
+          <span
+            className={`text-[8px] font-bold px-1 py-0.5 rounded-sm leading-none ${
+              ytPremium
+                ? "bg-amber-500/20 text-amber-400"
+                : "bg-white/10 text-gray-400"
+            }`}>
+            {ytPremium
+              ? t("player.premium", language)
+              : t("player.free", language)}
+          </span>
         </div>
         <div className="titlebar-nodrag flex items-center gap-1">
           <button
@@ -278,9 +290,16 @@ export default function CompactPlayer({
                   }`}>
                   {index + 1}
                 </span>
-                <span className="flex-1 text-[12px] truncate font-medium">
-                  {track.name}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="block text-[12px] truncate font-medium">
+                    {track.name}
+                  </span>
+                  {track.artists?.length > 0 && (
+                    <span className="block text-[10px] truncate text-gray-500">
+                      {track.artists.map((a) => a.name).join(", ")}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] text-gray-500 shrink-0">
                   {formatTime(track.duration_ms)}
                 </span>
@@ -341,9 +360,16 @@ export default function CompactPlayer({
                       <span className="w-5 text-right text-[11px] text-gray-500 shrink-0">
                         {index + 1}
                       </span>
-                      <span className="flex-1 text-[12px] truncate font-medium">
-                        {track.name}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="block text-[12px] truncate font-medium">
+                          {track.name}
+                        </span>
+                        {track.artists?.length > 0 && (
+                          <span className="block text-[10px] truncate text-gray-500">
+                            {track.artists.map((a) => a.name).join(", ")}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-gray-500 shrink-0">
                         {formatTime(track.duration_ms)}
                       </span>

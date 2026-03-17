@@ -18,14 +18,12 @@ export interface RakuTrack {
   uri: string;
   preview_url: string | null;
   provider: Provider;
+  itemType?: "song" | "album" | "playlist";
 }
 
 export interface RakuUser {
-  id: string;
   display_name: string;
-  email: string;
-  images: { url: string }[];
-  product: string;
+  avatar: string;
 }
 
 interface PlayerState {
@@ -33,9 +31,7 @@ interface PlayerState {
   provider: Provider | null;
 
   // Auth
-  accessToken: string | null;
-  refreshToken: string | null;
-  tokenExpiry: number | null;
+  isLoggedIn: boolean;
   user: RakuUser | null;
 
   // Player
@@ -61,10 +57,12 @@ interface PlayerState {
   queueIndex: number;
   youtubeHistory: RakuTrack[];
   artistPageData: { id: string; name: string } | null;
+  playlistPageData: { id: string; name: string; thumbnail: string } | null;
+  ytPremium: boolean;
 
   // Actions
   setProvider: (provider: Provider | null) => void;
-  setAuth: (token: string, refresh: string, expiry: number) => void;
+  setLoggedIn: (loggedIn: boolean) => void;
   setUser: (user: RakuUser | null) => void;
   clearAuth: () => void;
   setCurrentTrack: (track: RakuTrack | null) => void;
@@ -83,6 +81,10 @@ interface PlayerState {
   removeFromQueue: (index: number) => void;
   addToYouTubeHistory: (track: RakuTrack) => void;
   setArtistPage: (data: { id: string; name: string } | null) => void;
+  setPlaylistPage: (
+    data: { id: string; name: string; thumbnail: string } | null,
+  ) => void;
+  setYtPremium: (premium: boolean) => void;
 
   // Settings actions
   setLanguage: (lang: Language) => void;
@@ -99,9 +101,7 @@ export const useStore = create<PlayerState>((set) => ({
   provider: null,
 
   // Auth
-  accessToken: null,
-  refreshToken: null,
-  tokenExpiry: null,
+  isLoggedIn: false,
   user: null,
 
   // Player
@@ -133,19 +133,18 @@ export const useStore = create<PlayerState>((set) => ({
   queueIndex: -1,
   youtubeHistory: [],
   artistPageData: null,
+  playlistPageData: null,
+  ytPremium: false,
   toast: null,
 
   // Actions
   setProvider: (provider) => set({ provider }),
-  setAuth: (token, refresh, expiry) =>
-    set({ accessToken: token, refreshToken: refresh, tokenExpiry: expiry }),
+  setLoggedIn: (loggedIn) => set({ isLoggedIn: loggedIn }),
   setUser: (user) => set({ user }),
   clearAuth: () =>
     set({
       provider: null,
-      accessToken: null,
-      refreshToken: null,
-      tokenExpiry: null,
+      isLoggedIn: false,
       user: null,
     }),
   setCurrentTrack: (track) => set({ currentTrack: track }),
@@ -183,6 +182,8 @@ export const useStore = create<PlayerState>((set) => ({
       return { youtubeHistory: updated };
     }),
   setArtistPage: (data) => set({ artistPageData: data }),
+  setPlaylistPage: (data) => set({ playlistPageData: data }),
+  setYtPremium: (premium) => set({ ytPremium: premium }),
   setLanguage: (lang) => {
     try {
       localStorage.setItem("raku_lang", lang);

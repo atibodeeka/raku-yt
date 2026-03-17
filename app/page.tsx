@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useStore } from "@/lib/store";
-import { loadTokens } from "@/lib/auth-storage";
-import { getYouTubeUserInfo } from "@/lib/youtube-api";
+import { loadLogin } from "@/lib/auth-storage";
+import { checkYouTubeLogin, checkYouTubePremium } from "@/lib/youtube-auth";
 import { useYouTubePlayer } from "@/components/YouTubePlayer";
 import TitleBar from "@/components/TitleBar";
 import Sidebar from "@/components/Sidebar";
@@ -16,17 +16,15 @@ import LikedSongsPage from "@/components/pages/LikedSongsPage";
 import HistoryPage from "@/components/pages/HistoryPage";
 import LyricsPage from "@/components/pages/LyricsPage";
 import ArtistPage from "@/components/pages/ArtistPage";
+import PlaylistPage from "@/components/pages/PlaylistPage";
 import SettingsPage from "@/components/pages/SettingsPage";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
-  const accessToken = useStore((s) => s.accessToken);
+  const isLoggedIn = useStore((s) => s.isLoggedIn);
   const provider = useStore((s) => s.provider);
-  const user = useStore((s) => s.user);
   const currentPage = useStore((s) => s.currentPage);
   const compactMode = useStore((s) => s.compactMode);
-  const setUser = useStore((s) => s.setUser);
-  const clearAuth = useStore((s) => s.clearAuth);
 
   const playNextYouTube = useCallback(() => {
     const { queue, queueIndex, repeat, shuffle } = useStore.getState();
@@ -95,29 +93,37 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const stored = loadTokens();
+    // Restore login state from localStorage
+    const stored = loadLogin();
     if (stored) {
-      useStore.getState().setProvider(stored.provider);
-      useStore
-        .getState()
-        .setAuth(stored.accessToken, stored.refreshToken, stored.tokenExpiry);
+      useStore.getState().setProvider("youtube");
+      useStore.getState().setLoggedIn(true);
+      useStore.getState().setUser({
+        display_name: stored.name,
+        avatar: stored.avatar,
+      });
     }
+    // Also verify cookies still exist in session
+    checkYouTubeLogin().then((hasCookies) => {
+      if (stored && !hasCookies) {
+        // Cookies were deleted externally — clear login
+        useStore.getState().clearAuth();
+      }
+      if (hasCookies) {
+        // Check actual premium status from the account
+        checkYouTubePremium().then((isPremium) => {
+          useStore.getState().setYtPremium(isPremium);
+        });
+      }
+    });
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (accessToken && provider && !user) {
-      getYouTubeUserInfo(accessToken)
-        .then((userData) => setUser(userData))
-        .catch(() => clearAuth());
-    }
-  }, [accessToken, provider, user, setUser, clearAuth]);
 
   if (!mounted) {
     return <div className="h-screen bg-melon-bg" />;
   }
 
-  if (!accessToken) {
+  if (!isLoggedIn) {
     return (
       <div className="h-screen flex flex-col">
         <TitleBar />
@@ -152,6 +158,8 @@ export default function Home() {
         return <LyricsPage />;
       case "artist":
         return <ArtistPage />;
+      case "playlist":
+        return <PlaylistPage />;
       case "settings":
         return <SettingsPage />;
       default:
@@ -166,7 +174,14 @@ export default function Home() {
         <Sidebar />
         <main className="flex-1 overflow-y-auto">{renderPage()}</main>
       </div>
-      <Player />
+      <Player
+        onPlayPause={handlePlayPause}
+        onPrev={handlePrev}
+        onNext={handleNext}
+        onShuffle={handleShuffle}
+        onRepeat={handleRepeat}
+        onSeek={handleSeek}
+      />
     </div>
   );
 }

@@ -1,53 +1,31 @@
-import type { Provider } from "./store";
-
 const KEYS = {
-  provider: "raku_provider",
-  accessToken: "raku_access_token",
-  refreshToken: "raku_refresh_token",
-  tokenExpiry: "raku_token_expiry",
+  isLoggedIn: "raku_logged_in",
+  userName: "raku_user_name",
+  userAvatar: "raku_user_avatar",
 } as const;
 
-export interface StoredAuth {
-  provider: Provider;
-  accessToken: string;
-  refreshToken: string;
-  tokenExpiry: number;
+export interface StoredUser {
+  name: string;
+  avatar: string;
 }
 
-export function saveTokens(
-  provider: Provider,
-  accessToken: string,
-  refreshToken: string,
-  tokenExpiry: number,
-) {
-  localStorage.setItem(KEYS.provider, provider);
-  localStorage.setItem(KEYS.accessToken, accessToken);
-  if (refreshToken) {
-    localStorage.setItem(KEYS.refreshToken, refreshToken);
-  }
-  localStorage.setItem(KEYS.tokenExpiry, tokenExpiry.toString());
+export function saveLogin(name: string, avatar: string) {
+  localStorage.setItem(KEYS.isLoggedIn, "true");
+  localStorage.setItem(KEYS.userName, name);
+  localStorage.setItem(KEYS.userAvatar, avatar);
 }
 
-export function loadTokens(): StoredAuth | null {
-  const provider = localStorage.getItem(KEYS.provider) as Provider | null;
-  const accessToken = localStorage.getItem(KEYS.accessToken);
-  const refreshToken = localStorage.getItem(KEYS.refreshToken);
-  const tokenExpiry = localStorage.getItem(KEYS.tokenExpiry);
-
-  if (!provider || !accessToken || !refreshToken || !tokenExpiry) return null;
-
-  const expiry = parseInt(tokenExpiry, 10);
-  if (Date.now() >= expiry) {
-    clearTokens();
-    return null;
-  }
-
-  return { provider, accessToken, refreshToken, tokenExpiry: expiry };
+export function loadLogin(): StoredUser | null {
+  const isLoggedIn = localStorage.getItem(KEYS.isLoggedIn);
+  if (isLoggedIn !== "true") return null;
+  return {
+    name: localStorage.getItem(KEYS.userName) || "YouTube User",
+    avatar: localStorage.getItem(KEYS.userAvatar) || "",
+  };
 }
 
-export function clearTokens() {
-  localStorage.removeItem(KEYS.provider);
-  localStorage.removeItem(KEYS.accessToken);
-  localStorage.removeItem(KEYS.refreshToken);
-  localStorage.removeItem(KEYS.tokenExpiry);
+export function clearLogin() {
+  localStorage.removeItem(KEYS.isLoggedIn);
+  localStorage.removeItem(KEYS.userName);
+  localStorage.removeItem(KEYS.userAvatar);
 }

@@ -1,10 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
 import { useStore } from "@/lib/store";
 import { formatTime } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { useYouTubePlayer } from "@/components/YouTubePlayer";
 import {
   FiPlay,
   FiPause,
@@ -17,9 +15,23 @@ import {
   FiMusic,
 } from "react-icons/fi";
 
-export default function Player() {
-  const accessToken = useStore((s) => s.accessToken);
-  const provider = useStore((s) => s.provider);
+interface PlayerProps {
+  onPlayPause: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onShuffle: () => void;
+  onRepeat: () => void;
+  onSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+export default function Player({
+  onPlayPause,
+  onPrev,
+  onNext,
+  onShuffle,
+  onRepeat,
+  onSeek,
+}: PlayerProps) {
   const currentTrack = useStore((s) => s.currentTrack);
   const isPlaying = useStore((s) => s.isPlaying);
   const isLoadingTrack = useStore((s) => s.isLoadingTrack);
@@ -28,94 +40,15 @@ export default function Player() {
   const volume = useStore((s) => s.volume);
   const shuffle = useStore((s) => s.shuffle);
   const repeat = useStore((s) => s.repeat);
-  const setCurrentTrack = useStore((s) => s.setCurrentTrack);
-  const setIsPlaying = useStore((s) => s.setIsPlaying);
-  const setProgress = useStore((s) => s.setProgress);
-  const setDuration = useStore((s) => s.setDuration);
   const setVolume = useStore((s) => s.setVolume);
-  const setShuffle = useStore((s) => s.setShuffle);
-  const setRepeat = useStore((s) => s.setRepeat);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
-  const setQueueIndex = useStore((s) => s.setQueueIndex);
-  const addToYouTubeHistory = useStore((s) => s.addToYouTubeHistory);
   const setArtistPage = useStore((s) => s.setArtistPage);
   const toast = useStore((s) => s.toast);
   const language = useStore((s) => s.language);
 
-  // Queue-based next track for YouTube
-  const playNextYouTube = useCallback(() => {
-    const { queue, queueIndex, repeat, shuffle } = useStore.getState();
-    if (queue.length === 0) return;
-
-    let nextIndex: number;
-    if (shuffle) {
-      if (queue.length === 1) {
-        nextIndex = 0;
-      } else {
-        do {
-          nextIndex = Math.floor(Math.random() * queue.length);
-        } while (nextIndex === queueIndex);
-      }
-    } else {
-      nextIndex = queueIndex + 1;
-      if (nextIndex >= queue.length) {
-        if (repeat === "context") {
-          nextIndex = 0;
-        } else {
-          return;
-        }
-      }
-    }
-
-    useStore.getState().setQueueIndex(nextIndex);
-    useStore.getState().setCurrentTrack(queue[nextIndex]);
-    useStore.getState().addToYouTubeHistory(queue[nextIndex]);
-  }, []);
-
-  const { ytPlay, ytPause, ytSeek, ytSetVolume } =
-    useYouTubePlayer(playNextYouTube);
-
-  const handlePlayPause = async () => {
-    if (isPlaying) ytPause();
-    else ytPlay();
-  };
-
-  const handlePrev = async () => {
-    const { queue, queueIndex, progress } = useStore.getState();
-    if (progress > 3000 || queue.length === 0 || queueIndex <= 0) {
-      ytSeek(0);
-    } else {
-      const prevIndex = queueIndex - 1;
-      setQueueIndex(prevIndex);
-      setCurrentTrack(queue[prevIndex]);
-      addToYouTubeHistory(queue[prevIndex]);
-    }
-  };
-
-  const handleNext = async () => {
-    playNextYouTube();
-  };
-
-  const handleSeek = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const pos = parseInt(e.target.value, 10);
-    setProgress(pos);
-    ytSeek(pos);
-  };
-
   const handleVolumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseInt(e.target.value, 10);
     setVolume(vol);
-    ytSetVolume(vol);
-  };
-
-  const handleShuffle = async () => {
-    setShuffle(!shuffle);
-  };
-
-  const handleRepeat = async () => {
-    const states: ("off" | "context" | "track")[] = ["off", "context", "track"];
-    const nextIdx = (states.indexOf(repeat) + 1) % states.length;
-    setRepeat(states[nextIdx]);
   };
 
   const albumArt = currentTrack?.album?.images?.[0]?.url;
@@ -143,11 +76,13 @@ export default function Player() {
             )}
           </div>
           <div className="min-w-0">
-            <button
-              onClick={() => setCurrentPage("lyrics")}
-              className="block text-sm text-gray-800 truncate hover:underline max-w-[180px] font-medium">
-              {currentTrack?.name || t("player.noTrack", language)}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCurrentPage("lyrics")}
+                className="block text-sm text-gray-800 truncate hover:underline max-w-[180px] font-medium">
+                {currentTrack?.name || t("player.noTrack", language)}
+              </button>
+            </div>
             <p className="text-xs text-gray-500 truncate max-w-[180px]">
               {currentTrack?.artists?.map(
                 (a: { id: string; name: string }, i: number) => (
@@ -174,17 +109,17 @@ export default function Player() {
         <div className="flex-1 flex flex-col items-center gap-1">
           <div className="flex items-center gap-4">
             <button
-              onClick={handleShuffle}
+              onClick={onShuffle}
               className={`p-1 transition-colors ${shuffle ? "text-melon-green" : "text-gray-400 hover:text-gray-700"}`}>
               <FiShuffle size={14} />
             </button>
             <button
-              onClick={handlePrev}
+              onClick={onPrev}
               className="text-gray-500 hover:text-gray-800 transition-colors">
               <FiSkipBack size={16} />
             </button>
             <button
-              onClick={handlePlayPause}
+              onClick={onPlayPause}
               disabled={isLoadingTrack}
               className="w-9 h-9 rounded-full bg-melon-green hover:bg-melon-darkgreen flex items-center justify-center transition-colors shadow-md disabled:opacity-70">
               {isLoadingTrack ? (
@@ -196,12 +131,12 @@ export default function Player() {
               )}
             </button>
             <button
-              onClick={handleNext}
+              onClick={onNext}
               className="text-gray-500 hover:text-gray-800 transition-colors">
               <FiSkipForward size={16} />
             </button>
             <button
-              onClick={handleRepeat}
+              onClick={onRepeat}
               className={`p-1 transition-colors relative ${repeat !== "off" ? "text-melon-green" : "text-gray-400 hover:text-gray-700"}`}>
               <FiRepeat size={14} />
               {repeat === "track" && (
@@ -222,7 +157,7 @@ export default function Player() {
               min={0}
               max={duration || 100}
               value={progress}
-              onChange={handleSeek}
+              onChange={onSeek}
               className="flex-1"
             />
             <span className="text-[10px] text-gray-400 w-10">

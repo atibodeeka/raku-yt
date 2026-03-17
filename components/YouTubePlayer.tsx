@@ -11,6 +11,7 @@ declare global {
         videoId: string,
       ) => Promise<{ url?: string; error?: string; message?: string }>;
       check: () => Promise<{ installed: boolean; version?: string }>;
+      hasCookies: () => Promise<boolean>;
     };
   }
 }
@@ -103,6 +104,9 @@ export function useYouTubePlayer(onEnded?: () => void) {
     };
   }, [isYouTube]);
 
+  // Premium status is determined at login and on app mount via youtube:isPremium IPC
+  // (not from cookies.txt existence)
+
   // Load track via yt-dlp when currentTrack changes
   useEffect(() => {
     if (!isYouTube || !currentTrack) return;
@@ -155,9 +159,17 @@ export function useYouTubePlayer(onEnded?: () => void) {
         } else {
           console.warn(`yt-dlp failed for ${videoId}:`, result.error);
           const lang = useStore.getState().language;
-          useStore
-            .getState()
-            .showToast(`⏭ "${trackName}" ${t("player.skipMessage", lang)}`);
+          const isPremiumOnly = result.error === "premium_only";
+          const isCookieLock = result.error === "cookie_lock";
+          let toastMsg: string;
+          if (isPremiumOnly) {
+            toastMsg = `🔒 "${trackName}" ${t("player.premiumOnly", lang)}`;
+          } else if (isCookieLock) {
+            toastMsg = `🍪 ${t("player.cookieLock", lang)}`;
+          } else {
+            toastMsg = `⏭ "${trackName}" ${t("player.skipMessage", lang)}`;
+          }
+          useStore.getState().showToast(toastMsg);
           useStore.getState().setIsLoadingTrack(false);
           setIsPlaying(false);
           onEndedRef.current?.();

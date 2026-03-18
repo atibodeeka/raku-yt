@@ -175,6 +175,11 @@ export const translations = {
     en: "Playlists",
     ko: "재생목록",
   },
+  "search.filterYouTube": {
+    ja: "YouTube",
+    en: "YouTube",
+    ko: "YouTube",
+  },
 
   // Liked Songs
   "liked.title": { ja: "お気に入り", en: "Liked Songs", ko: "좋아요" },

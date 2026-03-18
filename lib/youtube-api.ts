@@ -20,6 +20,7 @@ declare global {
       getHistory: () => Promise<InnertubeTrack[]>;
       getLibraryPlaylists: () => Promise<LibraryPlaylistItem[]>;
       getSubscriptions: () => Promise<SubscriptionItem[]>;
+      getLyrics: (videoId: string) => Promise<string[] | null>;
       reportPlayback: (videoId: string) => Promise<{ success: boolean }>;
       rateSong: (
         videoId: string,
@@ -40,7 +41,21 @@ declare global {
       ) => Promise<{ success: boolean }>;
       deletePlaylist: (playlistId: string) => Promise<{ success: boolean }>;
     };
+    // YouTube-wide search
+    youtubeSearchAPI?: {
+      searchAll: (query: string) => Promise<YouTubeGeneralResult[]>;
+    };
   }
+}
+
+// YouTube general search result (all content types)
+export interface YouTubeGeneralResult {
+  videoId: string;
+  title: string;
+  channelName: string;
+  channelId: string;
+  durationMs: number;
+  thumbnail: string;
 }
 
 // Track object returned by our innertube browse handlers
@@ -298,7 +313,8 @@ export type SearchFilter =
   | "videos"
   | "albums"
   | "artists"
-  | "playlists";
+  | "playlists"
+  | "youtube";
 
 export async function searchYouTubeAll(
   query: string,
@@ -306,6 +322,27 @@ export async function searchYouTubeAll(
 ): Promise<RakuTrack[]> {
   if (!window.ytmusicAPI) return [];
 
+  if (filter === "youtube") {
+    if (!window.youtubeSearchAPI) return [];
+    const results = await window.youtubeSearchAPI.searchAll(query);
+    return results.map((r) => ({
+      id: r.videoId,
+      name: r.title,
+      artists: [{ id: r.channelId, name: r.channelName }],
+      album: {
+        id: "",
+        name: "",
+        images: r.thumbnail
+          ? [{ url: r.thumbnail, width: 480, height: 480 }]
+          : [],
+      },
+      duration_ms: r.durationMs,
+      uri: r.videoId,
+      preview_url: null,
+      provider: "youtube" as const,
+      itemType: "video" as const,
+    }));
+  }
   if (filter === "songs") {
     const songs = await window.ytmusicAPI.searchSongs(query);
     return songs.map((s) => {

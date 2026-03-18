@@ -47,7 +47,14 @@ interface PlayerState {
   // UI
   currentPage: string;
   searchQuery: string;
-  searchFilter: "all" | "songs" | "videos" | "albums" | "artists" | "playlists";
+  searchFilter:
+    | "all"
+    | "songs"
+    | "videos"
+    | "albums"
+    | "artists"
+    | "playlists"
+    | "youtube";
 
   // Settings
   language: Language;
@@ -77,7 +84,14 @@ interface PlayerState {
   setCurrentPage: (page: string) => void;
   setSearchQuery: (query: string) => void;
   setSearchFilter: (
-    filter: "all" | "songs" | "videos" | "albums" | "artists" | "playlists",
+    filter:
+      | "all"
+      | "songs"
+      | "videos"
+      | "albums"
+      | "artists"
+      | "playlists"
+      | "youtube",
   ) => void;
   setQueue: (tracks: RakuTrack[], startIndex?: number) => void;
   setQueueIndex: (index: number) => void;

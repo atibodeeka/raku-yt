@@ -623,6 +623,103 @@ ipcMain.handle("ytmusic:getSearchSuggestions", async (_event, query) => {
   return ytmusic.getSearchSuggestions(query);
 });
 
+// YouTube-wide search (all content types, not just music)
+ipcMain.handle("youtube:searchAll", async (_event, query) => {
+  try {
+    const loginSession = getLoginSession();
+    const sapisid = await getSAPISID();
+    if (!sapisid) return [];
+
+    const authorization = generateSAPISIDHash(
+      sapisid,
+      "https://www.youtube.com",
+    );
+
+    const body = {
+      context: {
+        client: {
+          clientName: "WEB",
+          clientVersion: "2.20260311.00.00",
+          hl: "en",
+          gl: "TH",
+        },
+      },
+      query,
+    };
+
+    const resp = await loginSession.fetch(
+      "https://www.youtube.com/youtubei/v1/search?prettyPrint=false",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Origin: "https://www.youtube.com",
+          Referer: "https://www.youtube.com/",
+          Authorization: authorization,
+          "X-Goog-AuthUser": "0",
+        },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!resp.ok) return [];
+    const data = await resp.json();
+
+    // Parse videoRenderer items from search results
+    const results = [];
+    const contents =
+      data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
+        ?.sectionListRenderer?.contents || [];
+
+    for (const section of contents) {
+      const items = section?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const vr = item.videoRenderer;
+        if (!vr) continue;
+
+        const videoId = vr.videoId;
+        if (!videoId) continue;
+
+        const title = vr.title?.runs?.map((r) => r.text).join("") || "";
+        const channelName = vr.ownerText?.runs?.[0]?.text || "";
+        const channelId =
+          vr.ownerText?.runs?.[0]?.navigationEndpoint?.browseEndpoint
+            ?.browseId || "";
+
+        // Parse duration text like "3:45" or "1:02:30"
+        const durationText = vr.lengthText?.simpleText || "";
+        let durationMs = 0;
+        if (durationText) {
+          const parts = durationText.split(":").map(Number);
+          if (parts.length === 3) {
+            durationMs = (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+          } else if (parts.length === 2) {
+            durationMs = (parts[0] * 60 + parts[1]) * 1000;
+          }
+        }
+
+        const thumbnail = vr.thumbnail?.thumbnails?.slice(-1)[0]?.url || "";
+
+        results.push({
+          videoId,
+          title,
+          channelName,
+          channelId,
+          durationMs,
+          thumbnail,
+        });
+      }
+    }
+
+    return results;
+  } catch (e) {
+    console.warn("YouTube general search failed:", e.message);
+    return [];
+  }
+});
+
 // Get audio stream URL directly via innertube player API using session cookies
 async function getAudioUrlFromInnertube(videoId) {
   const loginSession = getLoginSession();

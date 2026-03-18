@@ -21,6 +21,7 @@ const FILTERS: { key: SearchFilter; labelKey: TranslationKey }[] = [
   { key: "albums", labelKey: "search.filterAlbums" },
   { key: "artists", labelKey: "search.filterArtists" },
   { key: "playlists", labelKey: "search.filterPlaylists" },
+  { key: "youtube", labelKey: "search.filterYouTube" },
 ];
 
 export default function SearchPage() {

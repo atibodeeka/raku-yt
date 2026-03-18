@@ -55,6 +55,10 @@ contextBridge.exposeInMainWorld("ytmusicAPI", {
     ipcRenderer.invoke("ytmusic:deletePlaylist", playlistId),
 });
 
+contextBridge.exposeInMainWorld("youtubeSearchAPI", {
+  searchAll: (query) => ipcRenderer.invoke("youtube:searchAll", query),
+});
+
 contextBridge.exposeInMainWorld("ytdlpAPI", {
   getAudioUrl: (videoId) => ipcRenderer.invoke("ytdlp:getAudioUrl", videoId),
   check: () => ipcRenderer.invoke("ytdlp:check"),

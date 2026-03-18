@@ -2,5 +2,6 @@ node_modules/
 .next/
 out/
 dist/
+bin/
 .env.local
 *.log

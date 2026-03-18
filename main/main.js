@@ -8,6 +8,18 @@ const YTMusic = require("ytmusic-api");
 // Raise default max listeners to prevent warnings from concurrent HTTPS requests
 require("events").EventEmitter.defaultMaxListeners = 20;
 
+// Resolve bundled yt-dlp binary path (works in both dev and packaged app)
+function getYtDlpPath() {
+  if (app.isPackaged) {
+    // In packaged app, yt-dlp.exe is in the resources/bin/ directory
+    return path.join(process.resourcesPath, "bin", "yt-dlp.exe");
+  }
+  // In dev, try local bin/ first, then fall back to system PATH
+  const localBin = path.join(__dirname, "..", "bin", "yt-dlp.exe");
+  if (fs.existsSync(localBin)) return localBin;
+  return "yt-dlp";
+}
+
 let mainWindow;
 let loginWindow = null;
 let ytmusic = null;
@@ -195,16 +207,13 @@ async function checkPremiumStatus() {
           client: {
             clientName: "WEB_REMIX",
             clientVersion: "1.20260311.03.00",
-            hl: "th",
-            gl: "TH",
+            hl: "en",
+            gl: "US",
           },
         },
         videoId: testVideoId,
-        playbackContext: {
-          contentPlaybackContext: {
-            signatureTimestamp: 20073,
-          },
-        },
+        contentCheckOk: true,
+        racyCheckOk: true,
       },
     );
 
@@ -616,32 +625,64 @@ ipcMain.handle("ytmusic:getSearchSuggestions", async (_event, query) => {
 
 // Get audio stream URL directly via innertube player API using session cookies
 async function getAudioUrlFromInnertube(videoId) {
+  const loginSession = getLoginSession();
+  const sapisid = await getSAPISID();
+  if (!sapisid) throw new Error("Not logged in (no SAPISID)");
+
+  const authorization = generateSAPISIDHash(sapisid, "https://www.youtube.com");
+
+  // Use ANDROID client on youtube.com — more permissive than WEB_REMIX / ANDROID_MUSIC
   const body = {
     context: {
       client: {
-        clientName: "WEB_REMIX",
-        clientVersion: "1.20260311.03.00",
-        hl: "th",
-        gl: "TH",
+        clientName: "ANDROID",
+        clientVersion: "19.29.37",
+        androidSdkVersion: 30,
+        userAgent:
+          "com.google.android.youtube/19.29.37 (Linux; U; Android 11) gzip",
+        hl: "en",
+        gl: "US",
       },
     },
     videoId,
-    playbackContext: {
-      contentPlaybackContext: {
-        signatureTimestamp: 20073,
-      },
-    },
+    contentCheckOk: true,
+    racyCheckOk: true,
   };
 
-  const data = await ytMusicFetch(
-    "https://music.youtube.com/youtubei/v1/player?alt=json",
-    body,
+  const resp = await loginSession.fetch(
+    "https://www.youtube.com/youtubei/v1/player?prettyPrint=false",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent":
+          "com.google.android.youtube/19.29.37 (Linux; U; Android 11) gzip",
+        Origin: "https://www.youtube.com",
+        "X-Youtube-Client-Name": "3",
+        "X-Youtube-Client-Version": "19.29.37",
+        Authorization: authorization,
+        "X-Goog-AuthUser": "0",
+      },
+      body: JSON.stringify(body),
+    },
   );
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    console.error(`Innertube API error ${resp.status}: ${text.slice(0, 500)}`);
+    throw new Error(`Innertube API error: ${resp.status} ${resp.statusText}`);
+  }
+
+  const data = await resp.json();
 
   const status = data?.playabilityStatus?.status;
   if (status !== "OK") {
     const reason = data?.playabilityStatus?.reason || status || "unknown";
-    console.warn(`Innertube player status for ${videoId}: ${reason}`);
+    const sub = data?.playabilityStatus?.messages || [];
+    console.warn(
+      `Innertube player status for ${videoId}: ${status} — ${reason}`,
+      sub.length ? sub : "",
+    );
     return { error: "not_playable", message: reason };
   }
 
@@ -695,10 +736,10 @@ ipcMain.handle("ytdlp:getAudioUrl", async (_event, videoId) => {
         audioUrlCache.set(videoId, { url: result.url, time: Date.now() });
         return { url: result.url };
       }
-      // If innertube returned a non-recoverable error, return it
-      if (result.error === "not_playable") {
-        return result;
-      }
+      // Log innertube failure but always fall through to yt-dlp
+      console.log(
+        `Innertube failed for ${videoId} (${result.error}), trying yt-dlp...`,
+      );
     }
   } catch (e) {
     console.warn(`Innertube player failed for ${videoId}:`, e.message);
@@ -714,44 +755,60 @@ ipcMain.handle("ytdlp:getAudioUrl", async (_event, videoId) => {
       "-g",
       `https://music.youtube.com/watch?v=${videoId}`,
     ];
-    execFile("yt-dlp", args, { timeout: 15000 }, (error, stdout, stderr) => {
-      if (error) {
-        const msg = stderr || error.message || "";
-        console.error(`yt-dlp error for ${videoId}:`, msg);
-        // Detect Music Premium restriction
-        if (msg.includes("Music Premium") || msg.includes("premium members")) {
-          resolve({ error: "premium_only", message: msg });
+    execFile(
+      getYtDlpPath(),
+      args,
+      { timeout: 15000 },
+      (error, stdout, stderr) => {
+        if (error) {
+          const msg = stderr || error.message || "";
+          console.error(`yt-dlp error for ${videoId}:`, msg);
+          // Detect Music Premium restriction
+          if (
+            msg.includes("Music Premium") ||
+            msg.includes("premium members")
+          ) {
+            resolve({ error: "premium_only", message: msg });
+            return;
+          }
+          // Detect cookie database lock error
+          if (
+            msg.includes("Could not copy") &&
+            msg.includes("cookie database")
+          ) {
+            resolve({ error: "cookie_lock", message: msg });
+            return;
+          }
+          resolve({ error: "yt_dlp_failed", message: msg });
           return;
         }
-        // Detect cookie database lock error
-        if (msg.includes("Could not copy") && msg.includes("cookie database")) {
-          resolve({ error: "cookie_lock", message: msg });
-          return;
+        const url = stdout.trim();
+        if (url) {
+          audioUrlCache.set(videoId, { url, time: Date.now() });
+          resolve({ url });
+        } else {
+          resolve({ error: "no_url" });
         }
-        resolve({ error: "yt_dlp_failed", message: msg });
-        return;
-      }
-      const url = stdout.trim();
-      if (url) {
-        audioUrlCache.set(videoId, { url, time: Date.now() });
-        resolve({ url });
-      } else {
-        resolve({ error: "no_url" });
-      }
-    });
+      },
+    );
   });
 });
 
 // yt-dlp: check if installed
 ipcMain.handle("ytdlp:check", async () => {
   return new Promise((resolve) => {
-    execFile("yt-dlp", ["--version"], { timeout: 5000 }, (error, stdout) => {
-      if (error) {
-        resolve({ installed: false });
-      } else {
-        resolve({ installed: true, version: stdout.trim() });
-      }
-    });
+    execFile(
+      getYtDlpPath(),
+      ["--version"],
+      { timeout: 5000 },
+      (error, stdout) => {
+        if (error) {
+          resolve({ installed: false });
+        } else {
+          resolve({ installed: true, version: stdout.trim() });
+        }
+      },
+    );
   });
 });
 

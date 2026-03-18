@@ -43,7 +43,13 @@
     ],
     "win": {
       "target": "zip",
-      "icon": "public/icon.png"
+      "icon": "public/icon.png",
+      "extraResources": [
+        {
+          "from": "bin/yt-dlp.exe",
+          "to": "bin/yt-dlp.exe"
+        }
+      ]
     },
     "mac": {
       "target": "dmg",

@@ -28,6 +28,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download yt-dlp
+        run: |
+          mkdir bin
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "bin/yt-dlp.exe"
+        shell: pwsh
+
       - name: Build Next.js
         run: npx next build
 

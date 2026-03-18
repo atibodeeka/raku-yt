@@ -11,6 +11,19 @@ declare global {
       maximize: () => void;
       close: () => void;
       setCompactMode?: (compact: boolean) => void;
+      openLyricsWindow?: (data: {
+        position: string;
+        lyrics: string;
+        trackName: string;
+        artistName: string;
+      }) => void;
+      closeLyricsWindow?: () => void;
+      updateLyricsContent?: (data: {
+        lyrics: string;
+        trackName: string;
+        artistName: string;
+      }) => void;
+      onLyricsWindowClosed?: (callback: () => void) => void;
     };
   }
 }

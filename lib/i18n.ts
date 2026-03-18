@@ -398,6 +398,95 @@ export const translations = {
     en: "No results",
     ko: "결과 없음",
   },
+  "compact.lyrics": {
+    ja: "歌詞",
+    en: "Lyrics",
+    ko: "가사",
+  },
+  "compact.clearQueue": {
+    ja: "キューをクリア",
+    en: "Clear queue",
+    ko: "대기열 비우기",
+  },
+  "compact.clearQueueConfirm": {
+    ja: "キューをクリアしました",
+    en: "Queue cleared",
+    ko: "대기열을 비웠습니다",
+  },
+  "compact.playNow": {
+    ja: "今すぐ再生",
+    en: "Play now",
+    ko: "지금 재생",
+  },
+  "compact.moveUp": {
+    ja: "上に移動",
+    en: "Move up",
+    ko: "위로 이동",
+  },
+  "compact.moveDown": {
+    ja: "下に移動",
+    en: "Move down",
+    ko: "아래로 이동",
+  },
+  "compact.filterAll": { ja: "すべて", en: "All", ko: "전체" },
+  "compact.filterSongs": { ja: "曲", en: "Songs", ko: "곡" },
+  "compact.filterVideos": { ja: "動画", en: "Videos", ko: "동영상" },
+  "compact.filterAlbums": { ja: "アルバム", en: "Albums", ko: "앨범" },
+  "compact.filterArtists": {
+    ja: "アーティスト",
+    en: "Artists",
+    ko: "아티스트",
+  },
+  "compact.filterPlaylists": {
+    ja: "プレイリスト",
+    en: "Playlists",
+    ko: "재생목록",
+  },
+  "compact.filterYouTube": {
+    ja: "YouTube",
+    en: "YouTube",
+    ko: "YouTube",
+  },
+  "queue.title": {
+    ja: "キュー",
+    en: "Queue",
+    ko: "대기열",
+  },
+  "queue.nowPlaying": {
+    ja: "再生中",
+    en: "Now Playing",
+    ko: "재생 중",
+  },
+  "queue.nextUp": {
+    ja: "次に再生",
+    en: "Next Up",
+    ko: "다음 재생",
+  },
+  "queue.empty": {
+    ja: "キューが空です",
+    en: "Queue is empty",
+    ko: "대기열이 비어 있습니다",
+  },
+  "queue.emptyHint": {
+    ja: "曲を検索して追加してください",
+    en: "Search and add songs to queue",
+    ko: "곡을 검색하여 추가하세요",
+  },
+  "queue.clear": {
+    ja: "クリア",
+    en: "Clear",
+    ko: "비우기",
+  },
+  "queue.cleared": {
+    ja: "キューをクリアしました",
+    en: "Queue cleared",
+    ko: "대기열을 비웠습니다",
+  },
+  "queue.tracks": {
+    ja: "曲",
+    en: "tracks",
+    ko: "곡",
+  },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

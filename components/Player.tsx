@@ -24,7 +24,9 @@ import {
   FiHeart,
   FiPlus,
   FiX,
+  FiList,
 } from "react-icons/fi";
+import type { RakuTrack } from "@/lib/store";
 
 interface PlayerProps {
   onPlayPause: () => void;
@@ -57,6 +59,10 @@ export default function Player({
   const toast = useStore((s) => s.toast);
   const showToast = useStore((s) => s.showToast);
   const language = useStore((s) => s.language);
+
+  const queue = useStore((s) => s.queue);
+  const showQueueSidebar = useStore((s) => s.showQueueSidebar);
+  const setShowQueueSidebar = useStore((s) => s.setShowQueueSidebar);
 
   const [isLiked, setIsLiked] = useState(false);
   const [likingInProgress, setLikingInProgress] = useState(false);
@@ -359,6 +365,19 @@ export default function Player({
             onChange={handleVolumeChange}
             className="flex-1"
           />
+
+          {/* Queue button */}
+          <button
+            onClick={() => setShowQueueSidebar(!showQueueSidebar)}
+            className={`p-1 transition-colors relative ${showQueueSidebar ? "text-melon-green" : "text-gray-400 hover:text-gray-700"}`}
+            title={t("queue.title", language)}>
+            <FiList size={15} />
+            {queue.length > 0 && (
+              <span className="absolute -top-1 -right-1 text-[7px] bg-melon-green text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold">
+                {queue.length > 99 ? "99" : queue.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
     </div>

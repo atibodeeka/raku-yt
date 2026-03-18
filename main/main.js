@@ -1731,6 +1731,11 @@ ipcMain.on("set-compact-mode", (_event, compact) => {
     });
     mainWindow.setResizable(false);
   } else {
+    // Close lyrics window when exiting compact mode
+    if (lyricsWindow && !lyricsWindow.isDestroyed()) {
+      lyricsWindow.close();
+      lyricsWindow = null;
+    }
     mainWindow.setResizable(true);
     mainWindow.setMinimumSize(900, 600);
     mainWindow.setMaximumSize(0, 0);
@@ -1741,3 +1746,108 @@ ipcMain.on("set-compact-mode", (_event, compact) => {
     }
   }
 });
+
+// Lyrics popup window for compact mode
+let lyricsWindow = null;
+
+ipcMain.on(
+  "open-lyrics-window",
+  (_event, { position, lyrics, trackName, artistName }) => {
+    if (!mainWindow) return;
+
+    // If already open, just update content and reposition
+    if (lyricsWindow && !lyricsWindow.isDestroyed()) {
+      lyricsWindow.webContents.send("update-lyrics", {
+        lyrics,
+        trackName,
+        artistName,
+      });
+      return;
+    }
+
+    const mainBounds = mainWindow.getBounds();
+    const winWidth = 280;
+    const winHeight = mainBounds.height;
+    let x, y;
+
+    if (position === "left") {
+      x = mainBounds.x - winWidth - 4;
+      y = mainBounds.y;
+    } else {
+      x = mainBounds.x + mainBounds.width + 4;
+      y = mainBounds.y;
+    }
+
+    lyricsWindow = new BrowserWindow({
+      width: winWidth,
+      height: winHeight,
+      x,
+      y,
+      frame: false,
+      resizable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      backgroundColor: "#ffffff",
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        preload: path.join(__dirname, "lyrics-preload.js"),
+      },
+    });
+
+    lyricsWindow.loadFile(path.join(__dirname, "lyrics.html"));
+
+    lyricsWindow.webContents.on("did-finish-load", () => {
+      lyricsWindow.webContents.send("update-lyrics", {
+        lyrics,
+        trackName,
+        artistName,
+      });
+    });
+
+    // Follow main window movement
+    const onMove = () => {
+      if (!lyricsWindow || lyricsWindow.isDestroyed() || !mainWindow) return;
+      const mb = mainWindow.getBounds();
+      const lx =
+        position === "left" ? mb.x - winWidth - 4 : mb.x + mb.width + 4;
+      lyricsWindow.setBounds({
+        x: lx,
+        y: mb.y,
+        width: winWidth,
+        height: mb.height,
+      });
+    };
+    mainWindow.on("move", onMove);
+    mainWindow.on("resize", onMove);
+
+    lyricsWindow.on("closed", () => {
+      lyricsWindow = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.removeListener("move", onMove);
+        mainWindow.removeListener("resize", onMove);
+        mainWindow.webContents.send("lyrics-window-closed");
+      }
+    });
+  },
+);
+
+ipcMain.on("close-lyrics-window", () => {
+  if (lyricsWindow && !lyricsWindow.isDestroyed()) {
+    lyricsWindow.close();
+    lyricsWindow = null;
+  }
+});
+
+ipcMain.on(
+  "update-lyrics-content",
+  (_event, { lyrics, trackName, artistName }) => {
+    if (lyricsWindow && !lyricsWindow.isDestroyed()) {
+      lyricsWindow.webContents.send("update-lyrics", {
+        lyrics,
+        trackName,
+        artistName,
+      });
+    }
+  },
+);

@@ -108,6 +108,10 @@ interface PlayerState {
   setLanguage: (lang: Language) => void;
   setCompactMode: (compact: boolean) => void;
 
+  // Queue sidebar (normal mode)
+  showQueueSidebar: boolean;
+  setShowQueueSidebar: (show: boolean) => void;
+
   // Toast notification
   toast: string | null;
   showToast: (message: string) => void;
@@ -154,6 +158,7 @@ export const useStore = create<PlayerState>((set) => ({
   artistPageData: null,
   playlistPageData: null,
   ytPremium: false,
+  showQueueSidebar: false,
   toast: null,
 
   // Actions
@@ -229,6 +234,7 @@ export const useStore = create<PlayerState>((set) => ({
       api.setCompactMode?.(compact);
     }
   },
+  setShowQueueSidebar: (show) => set({ showQueueSidebar: show }),
   showToast: (message) => {
     set({ toast: message });
     setTimeout(() => set({ toast: null }), 3000);

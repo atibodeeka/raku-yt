@@ -10,6 +10,7 @@ import Sidebar from "@/components/Sidebar";
 import Player from "@/components/Player";
 import CompactPlayer from "@/components/CompactPlayer";
 import LoginScreen from "@/components/LoginScreen";
+import QueueSidebar from "@/components/QueueSidebar";
 import HomePage from "@/components/pages/HomePage";
 import SearchPage from "@/components/pages/SearchPage";
 import LikedSongsPage from "@/components/pages/LikedSongsPage";
@@ -25,6 +26,7 @@ export default function Home() {
   const provider = useStore((s) => s.provider);
   const currentPage = useStore((s) => s.currentPage);
   const compactMode = useStore((s) => s.compactMode);
+  const showQueueSidebar = useStore((s) => s.showQueueSidebar);
 
   const playNextYouTube = useCallback(() => {
     const { queue, queueIndex, repeat, shuffle } = useStore.getState();
@@ -182,6 +184,7 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-y-auto">{renderPage()}</main>
+        {showQueueSidebar && <QueueSidebar />}
       </div>
       <Player
         onPlayPause={handlePlayPause}

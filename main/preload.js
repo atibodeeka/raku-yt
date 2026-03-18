@@ -5,6 +5,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   maximize: () => ipcRenderer.send("window-maximize"),
   close: () => ipcRenderer.send("window-close"),
   setCompactMode: (compact) => ipcRenderer.send("set-compact-mode", compact),
+  openLyricsWindow: (data) => ipcRenderer.send("open-lyrics-window", data),
+  closeLyricsWindow: () => ipcRenderer.send("close-lyrics-window"),
+  updateLyricsContent: (data) =>
+    ipcRenderer.send("update-lyrics-content", data),
+  onLyricsWindowClosed: (callback) => {
+    ipcRenderer.on("lyrics-window-closed", () => callback());
+  },
 });
 
 contextBridge.exposeInMainWorld("youtubeAuth", {

@@ -11,10 +11,10 @@ import {
 import TrackList from "@/components/TrackList";
 import Spinner from "@/components/ui/Spinner";
 import PageHeader from "@/components/ui/PageHeader";
-import { t } from "@/lib/i18n";
+import { t, TranslationKey } from "@/lib/i18n";
 import { FiSearch } from "react-icons/fi";
 
-const FILTERS: { key: SearchFilter; labelKey: string }[] = [
+const FILTERS: { key: SearchFilter; labelKey: TranslationKey }[] = [
   { key: "all", labelKey: "search.filterAll" },
   { key: "songs", labelKey: "search.filterSongs" },
   { key: "videos", labelKey: "search.filterVideos" },

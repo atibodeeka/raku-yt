@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { t, Language } from "@/lib/i18n";
 import PageHeader from "@/components/ui/PageHeader";

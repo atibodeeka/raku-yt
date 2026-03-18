@@ -60,7 +60,6 @@ export default function CompactPlayer({
   const setVolume = useStore((s) => s.setVolume);
   const queue = useStore((s) => s.queue);
   const queueIndex = useStore((s) => s.queueIndex);
-  const isLoggedIn = useStore((s) => s.isLoggedIn);
   const setCompactMode = useStore((s) => s.setCompactMode);
   const setCurrentTrack = useStore((s) => s.setCurrentTrack);
   const setIsPlaying = useStore((s) => s.setIsPlaying);

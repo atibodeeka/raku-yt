@@ -486,9 +486,7 @@ function createWindow() {
     icon: path.join(__dirname, "..", "public", "icon.png"),
   });
 
-  const isDev = process.env.NODE_ENV !== "production";
-
-  if (isDev) {
+  if (!app.isPackaged) {
     mainWindow.loadURL("http://localhost:3000");
   } else {
     mainWindow.loadFile(path.join(__dirname, "..", "out", "index.html"));
